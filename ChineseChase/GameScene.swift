@@ -88,6 +88,39 @@ final class GameScene: SKScene {
         addChild(piecesNode)
         addChild(endgameBanner)
 
+        // Initialize player labels
+        player1Label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        player1Label.fontSize = 16
+        player1Label.fontColor = .red
+        player1Label.text = "RED ARMY"
+        player1Label.position = CGPoint(x: 80, y: size.height - 40)
+        addChild(player1Label)
+        
+        player2Label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        player2Label.fontSize = 16
+        player2Label.fontColor = .black
+        player2Label.text = "BLACK ARMY"
+        player2Label.position = CGPoint(x: 80, y: size.height - 60)
+        addChild(player2Label)
+        
+        // Initialize current player indicator
+        currentPlayerIndicator = SKShapeNode(rectOf: CGSize(width: 12, height: 12))
+        currentPlayerIndicator.fillColor = .red
+        currentPlayerIndicator.strokeColor = .clear
+        currentPlayerIndicator.position = CGPoint(x: 60, y: size.height - 40)
+        addChild(currentPlayerIndicator)
+        
+        // Initialize captured pieces display
+        capturedPiecesNode = SKNode()
+        capturedPiecesNode.position = CGPoint(x: 0, y: 0)
+        addChild(capturedPiecesNode)
+
+        // Initialize game BEFORE calling saveGameState
+        game = BanqiGame()
+        if useDeterministicSeed {
+            game = BanqiGame(seed: currentSeed)
+        }
+
         statusLabel.fontSize = 18
         statusLabel.fontColor = SKColor(white: 0.1, alpha: 1)
         statusLabel.horizontalAlignmentMode = .center
@@ -104,6 +137,16 @@ final class GameScene: SKScene {
         logLabel.position = CGPoint(x: size.width / 2, y: 10)
         addChild(logLabel)
 
+        // Save initial game state AFTER game is initialized
+        saveGameState()
+        
+        // Set up board
+        layoutBoard()
+        renderBoard()
+        positionAllNodes()
+        updateStatus()
+        updateCapturedPieces()
+        
         // New Game button
         newGameButton.text = "New"
         newGameButton.fontSize = 16
@@ -209,11 +252,6 @@ final class GameScene: SKScene {
         
         // Tutorial overlay
         addChild(tutorialOverlay)
-        
-        layoutBoard()
-        renderBoard()
-        renderAllPieces()
-        updateStatus()
         
         // Show tutorial on first run
         if showTutorial {
