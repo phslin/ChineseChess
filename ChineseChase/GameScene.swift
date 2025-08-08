@@ -21,15 +21,15 @@ final class GameScene: SKScene {
     private var gridNode = SKNode()
     private var piecesNode = SKNode()
     private var highlightsNode = SKNode()
-    private var statusLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var newGameButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var logLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var clearLogButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var seedLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var seedToggleButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var undoButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var redoButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var settingsButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var statusLabel = SKLabelNode()
+    private var newGameButton = SKLabelNode()
+    private var logLabel = SKLabelNode()
+    private var clearLogButton = SKLabelNode()
+    private var seedLabel = SKLabelNode()
+    private var seedToggleButton = SKLabelNode()
+    private var undoButton = SKLabelNode()
+    private var redoButton = SKLabelNode()
+    private var settingsButton = SKLabelNode()
     private var settingsPanel = SKNode()
     private var tutorialOverlay = SKNode()
     // Player labels - more professional game style
@@ -144,8 +144,9 @@ final class GameScene: SKScene {
         layoutBoard()
         renderBoard()
         positionAllNodes()
-        updateStatus()
-        updateCapturedPieces()
+        
+        // Don't call updateStatus or updateCapturedPieces during initialization
+        // They will be called when needed
         
         // New Game button
         newGameButton.text = "New"
@@ -225,31 +226,6 @@ final class GameScene: SKScene {
         // Settings panel
         addChild(settingsPanel)
         
-        // Player labels
-        player1Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-        player1Label.text = "Player 1 (Red)"
-        player1Label.fontSize = 14
-        player1Label.fontColor = SKColor.red
-        player1Label.horizontalAlignmentMode = .left
-        player1Label.verticalAlignmentMode = .top
-        player1Label.position = CGPoint(x: 16, y: size.height - 40)
-        addChild(player1Label)
-        
-        player2Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-        player2Label.text = "Player 2 (Black)"
-        player2Label.fontSize = 14
-        player2Label.fontColor = SKColor.black
-        player2Label.horizontalAlignmentMode = .left
-        player2Label.verticalAlignmentMode = .top
-        player2Label.position = CGPoint(x: 16, y: size.height - 60)
-        addChild(player2Label)
-        
-        // Captured pieces display
-        capturedPiecesNode = SKNode()
-        capturedPiecesNode.position = CGPoint(x: size.width / 2, y: 10)
-        capturedPiecesNode.zPosition = 10
-        addChild(capturedPiecesNode)
-        
         // Tutorial overlay
         addChild(tutorialOverlay)
         
@@ -271,7 +247,14 @@ final class GameScene: SKScene {
         redoButton.position = CGPoint(x: size.width - 40, y: size.height - 16)
         player1Label.position = CGPoint(x: 80, y: size.height - 40)
         player2Label.position = CGPoint(x: 80, y: size.height - 60)
-        currentPlayerIndicator.position = CGPoint(x: 60, y: game.sideToMove == .red ? size.height - 40 : size.height - 60)
+        
+        // Fix the crash by properly handling optional game.sideToMove
+        if let currentPlayer = game.sideToMove {
+            currentPlayerIndicator.position = CGPoint(x: 60, y: currentPlayer == .red ? size.height - 40 : size.height - 60)
+        } else {
+            currentPlayerIndicator.position = CGPoint(x: 60, y: size.height - 40) // Default to red position
+        }
+        
         capturedPiecesNode.position = CGPoint(x: 0, y: 0)
         layoutBoard()
         renderBoard()
@@ -1026,7 +1009,7 @@ final class GameScene: SKScene {
         highlightsNode.removeAllChildren()
         renderAllPieces()
         updateStatus()
-        updateUndoRedoButtons()
+        updateCapturedPieces()
     }
     
     private func updateUndoRedoButtons() {
