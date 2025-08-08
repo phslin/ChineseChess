@@ -50,11 +50,11 @@ public final class BanqiGame {
     public static let numberOfColumns: Int = 4
     public static let numberOfRows: Int = 8
 
-    public private(set) var board: [[BanqiPiece?]] // [row][column]
-    public private(set) var sideToMove: BanqiPieceColor? // nil until first flip determines colors
-    public private(set) var gameOver: Bool = false
-    public private(set) var winner: BanqiPieceColor?
-    public private(set) var lastAction: BanqiAction?
+    public var board: [[BanqiPiece?]] // [row][column]
+    public var sideToMove: BanqiPieceColor? // nil until first flip determines colors
+    public var gameOver: Bool = false
+    public var winner: BanqiPieceColor?
+    public var lastAction: BanqiAction?
 
     private var randomSource: GKRandomSource
 

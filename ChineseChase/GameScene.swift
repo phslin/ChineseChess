@@ -7,6 +7,8 @@
 
 import SpriteKit
 import GameplayKit
+import UIKit
+import AVFoundation
 
 final class GameScene: SKScene {
     // Kept for compatibility with template loading from GameViewController
@@ -22,16 +24,52 @@ final class GameScene: SKScene {
     private var statusLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
     private var newGameButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
     private var logLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var clearLogButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var seedLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var seedToggleButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var undoButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var redoButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var settingsButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var settingsPanel = SKNode()
+    private var tutorialOverlay = SKNode()
+    private var player1Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var player2Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var endgameBanner = SKNode()
+    
+    private var useDeterministicSeed = false
+    private var currentSeed: UInt64 = 12345
+    private var showTutorial = false
+    
+    // Style toggles
+    private var currentBoardTheme = "classic"
+    private var currentPieceStyle = "characters"
+    
+    // Sound effects
+    private var moveSound: AVAudioPlayer?
+    private var captureSound: AVAudioPlayer?
+    
+    // Undo/redo system
+    private var gameHistory: [BanqiGame] = []
+    private var currentHistoryIndex = -1
+    private let maxHistorySize = 50
 
     private var tileSize: CGFloat = 64
     private var boardOrigin: CGPoint = .zero
     private var selectedPosition: BanqiPosition?
     private var legalTargets: [BanqiPosition] = []
     private var moveLog: [String] = []
+    private var selectionBorder: SKShapeNode?
 
     override func didMove(to view: SKView) {
-        backgroundColor = SKColor(white: 0.1, alpha: 1)
+        backgroundColor = SKColor(red: 0.89, green: 0.86, blue: 0.82, alpha: 1)
         removeAllChildren()
+        
+        // Load user preferences
+        loadUserDefaults()
+        
+        // Set up for optimal performance
+        view.preferredFramesPerSecond = 60
+        view.ignoresSiblingOrder = true
 
         boardNode.removeAllChildren()
         piecesNode.removeAllChildren()
@@ -41,38 +79,131 @@ final class GameScene: SKScene {
         addChild(gridNode)
         addChild(highlightsNode)
         addChild(piecesNode)
+        addChild(endgameBanner)
 
-        statusLabel.fontSize = 20
-        statusLabel.fontColor = .white
+        statusLabel.fontSize = 18
+        statusLabel.fontColor = SKColor(white: 0.1, alpha: 1)
         statusLabel.horizontalAlignmentMode = .center
         statusLabel.verticalAlignmentMode = .top
-        statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 12)
+        statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 8)
         addChild(statusLabel)
         
-        logLabel.fontSize = 14
-        logLabel.fontColor = SKColor(white: 0.9, alpha: 0.9)
+        logLabel.fontSize = 13
+        logLabel.fontColor = SKColor(white: 0.15, alpha: 1)
         logLabel.horizontalAlignmentMode = .center
         logLabel.verticalAlignmentMode = .bottom
         logLabel.numberOfLines = 2
         logLabel.preferredMaxLayoutWidth = size.width * 0.9
-        logLabel.position = CGPoint(x: size.width / 2, y: 12)
+        logLabel.position = CGPoint(x: size.width / 2, y: 10)
         addChild(logLabel)
 
         // New Game button
         newGameButton.text = "New"
         newGameButton.fontSize = 16
-        newGameButton.fontColor = SKColor(white: 0.95, alpha: 1)
+        newGameButton.fontColor = SKColor(white: 0.1, alpha: 1)
         newGameButton.horizontalAlignmentMode = .left
         newGameButton.verticalAlignmentMode = .top
         newGameButton.name = "newGameButton"
         newGameButton.zPosition = 5
-        newGameButton.position = CGPoint(x: 16, y: size.height - 16)
+        newGameButton.position = CGPoint(x: 16, y: size.height - 10)
+        newGameButton.accessibilityLabel = "New Game"
+        newGameButton.accessibilityHint = "Start a new game"
         addChild(newGameButton)
 
+        // Clear log button
+        clearLogButton.text = "Clear"
+        clearLogButton.fontSize = 14
+        clearLogButton.fontColor = SKColor(white: 0.3, alpha: 1)
+        clearLogButton.horizontalAlignmentMode = .right
+        clearLogButton.verticalAlignmentMode = .bottom
+        clearLogButton.name = "clearLogButton"
+        clearLogButton.zPosition = 5
+        clearLogButton.position = CGPoint(x: size.width - 16, y: 10)
+        addChild(clearLogButton)
+
+        // Seed controls
+        seedLabel.text = "Seed: 12345"
+        seedLabel.fontSize = 12
+        seedLabel.fontColor = SKColor(white: 0.4, alpha: 1)
+        seedLabel.horizontalAlignmentMode = .left
+        seedLabel.verticalAlignmentMode = .bottom
+        seedLabel.position = CGPoint(x: 16, y: 30)
+        addChild(seedLabel)
+        
+        seedToggleButton.text = "Random"
+        seedToggleButton.fontSize = 12
+        seedToggleButton.fontColor = SKColor(white: 0.4, alpha: 1)
+        seedToggleButton.horizontalAlignmentMode = .left
+        seedToggleButton.verticalAlignmentMode = .bottom
+        seedToggleButton.name = "seedToggleButton"
+        seedToggleButton.zPosition = 5
+        seedToggleButton.position = CGPoint(x: 16, y: 50)
+        addChild(seedToggleButton)
+        
+        // Undo/Redo buttons
+        undoButton.text = "↶"
+        undoButton.fontSize = 16
+        undoButton.fontColor = SKColor(white: 0.4, alpha: 1)
+        undoButton.horizontalAlignmentMode = .center
+        undoButton.verticalAlignmentMode = .bottom
+        undoButton.name = "undoButton"
+        undoButton.zPosition = 5
+        undoButton.position = CGPoint(x: size.width - 60, y: size.height - 16)
+        addChild(undoButton)
+        
+        redoButton.text = "↷"
+        redoButton.fontSize = 16
+        redoButton.fontColor = SKColor(white: 0.4, alpha: 1)
+        redoButton.horizontalAlignmentMode = .center
+        redoButton.verticalAlignmentMode = .bottom
+        redoButton.name = "redoButton"
+        redoButton.zPosition = 5
+        redoButton.position = CGPoint(x: size.width - 40, y: size.height - 16)
+        addChild(redoButton)
+        
+        // Settings button
+        settingsButton.text = "⚙"
+        settingsButton.fontSize = 16
+        settingsButton.fontColor = SKColor(white: 0.4, alpha: 1)
+        settingsButton.horizontalAlignmentMode = .center
+        settingsButton.verticalAlignmentMode = .bottom
+        settingsButton.name = "settingsButton"
+        settingsButton.zPosition = 5
+        settingsButton.position = CGPoint(x: size.width - 80, y: size.height - 16)
+        addChild(settingsButton)
+        
+        // Settings panel
+        addChild(settingsPanel)
+        
+        // Player labels
+        player1Label.text = "Player 1 (Red)"
+        player1Label.fontSize = 14
+        player1Label.fontColor = SKColor.red
+        player1Label.horizontalAlignmentMode = .left
+        player1Label.verticalAlignmentMode = .top
+        player1Label.position = CGPoint(x: 16, y: size.height - 40)
+        addChild(player1Label)
+        
+        player2Label.text = "Player 2 (Black)"
+        player2Label.fontSize = 14
+        player2Label.fontColor = SKColor.black
+        player2Label.horizontalAlignmentMode = .left
+        player2Label.verticalAlignmentMode = .top
+        player2Label.position = CGPoint(x: 16, y: size.height - 60)
+        addChild(player2Label)
+        
+        // Tutorial overlay
+        addChild(tutorialOverlay)
+        
         layoutBoard()
         renderBoard()
         renderAllPieces()
         updateStatus()
+        
+        // Show tutorial on first run
+        if showTutorial {
+            showTutorialOverlay()
+        }
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
@@ -80,6 +211,11 @@ final class GameScene: SKScene {
         statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 12)
         logLabel.position = CGPoint(x: size.width / 2, y: 12)
         newGameButton.position = CGPoint(x: 16, y: size.height - 16)
+        clearLogButton.position = CGPoint(x: size.width - 16, y: 10)
+        seedLabel.position = CGPoint(x: 16, y: 30)
+        seedToggleButton.position = CGPoint(x: 16, y: 50)
+        undoButton.position = CGPoint(x: size.width - 60, y: size.height - 16)
+        redoButton.position = CGPoint(x: size.width - 40, y: size.height - 16)
         layoutBoard()
         renderBoard()
         positionAllNodes()
@@ -89,13 +225,15 @@ final class GameScene: SKScene {
     // MARK: - Layout
 
     private func layoutBoard() {
-        let cols = CGFloat(BanqiGame.numberOfColumns)
-        let rows = CGFloat(BanqiGame.numberOfRows)
-        let usableWidth = size.width * 0.9
-        let usableHeight = size.height * 0.82
-        tileSize = min(usableWidth / cols, usableHeight / rows)
-        let boardWidth = cols * tileSize
-        let boardHeight = rows * tileSize
+        // Render the board rotated 90° clockwise so it fills landscape (8 across × 4 tall)
+        let renderCols = CGFloat(BanqiGame.numberOfRows)   // 8 across
+        let renderRows = CGFloat(BanqiGame.numberOfColumns) // 4 tall
+        let safeInset: CGFloat = 20
+        let usableWidth = max(0, size.width - safeInset * 2)
+        let usableHeight = max(0, size.height - safeInset * 2)
+        tileSize = min(usableWidth / renderCols, usableHeight / renderRows)
+        let boardWidth = renderCols * tileSize
+        let boardHeight = renderRows * tileSize
         boardOrigin = CGPoint(
             x: (size.width - boardWidth) / 2,
             y: (size.height - boardHeight) / 2
@@ -111,40 +249,48 @@ final class GameScene: SKScene {
         let cols = BanqiGame.numberOfColumns
         let rows = BanqiGame.numberOfRows
 
-        // Board background (beige with thick border to match sample)
-        let boardRect = CGRect(x: boardOrigin.x, y: boardOrigin.y, width: CGFloat(cols) * tileSize, height: CGFloat(rows) * tileSize)
-        let frameOuter = SKShapeNode(rect: boardRect.insetBy(dx: -10, dy: -10))
-        frameOuter.strokeColor = SKColor(white: 0.05, alpha: 1)
-        frameOuter.lineWidth = 6
-        frameOuter.fillColor = .clear
-        boardNode.addChild(frameOuter)
-
+        // Board background sized to rotated grid (8 × 4)
+        let boardRect = CGRect(x: boardOrigin.x, y: boardOrigin.y, width: CGFloat(rows) * tileSize, height: CGFloat(cols) * tileSize)
+        
+        // Use a single background node for better performance
         let background = SKShapeNode(rect: boardRect)
         background.fillColor = SKColor(red: 0.93, green: 0.90, blue: 0.84, alpha: 1)
         background.strokeColor = SKColor(white: 0.0, alpha: 0.8)
         background.lineWidth = 3
         boardNode.addChild(background)
+        
+        // Add frame as a separate node for better layering
+        let frameOuter = SKShapeNode(rect: boardRect.insetBy(dx: -10, dy: -10))
+        frameOuter.strokeColor = SKColor(white: 0.05, alpha: 1)
+        frameOuter.lineWidth = 6
+        frameOuter.fillColor = .clear
+        frameOuter.zPosition = 0.1
+        boardNode.addChild(frameOuter)
 
-        // Grid tiles (thin dark lines, beige squares)
+        // Grid tiles (thin dark lines, beige squares) – iterate real board coords but place at rotated draw coords
         for row in 0..<rows {
             for col in 0..<cols {
-                let rect = CGRect(x: boardOrigin.x + CGFloat(col) * tileSize,
-                                  y: boardOrigin.y + CGFloat(row) * tileSize,
-                                  width: tileSize,
-                                  height: tileSize)
-                let tile = SKShapeNode(rect: rect)
-                tile.fillColor = SKColor(red: 0.94, green: 0.91, blue: 0.86, alpha: 1)
-                tile.strokeColor = SKColor(white: 0.0, alpha: 0.6)
-                tile.lineWidth = 1.2
+                let boardPos = BanqiPosition(column: col, row: row)
+                let drawPos = toDrawGridIndices(from: boardPos)
+                let tileRect = CGRect(
+                    x: boardOrigin.x + CGFloat(drawPos.x) * tileSize,
+                    y: boardOrigin.y + CGFloat(drawPos.y) * tileSize,
+                    width: tileSize, height: tileSize
+                )
+                let tile = SKShapeNode(rect: tileRect)
+                tile.strokeColor = SKColor(white: 0.0, alpha: 0.3)
+                tile.lineWidth = 0.8
+                tile.fillColor = .clear
                 tile.name = "cell_\(col)_\(row)"
+                tile.accessibilityLabel = "Board cell \(coord(boardPos))"
                 gridNode.addChild(tile)
             }
         }
 
-        // Palace-style diagonals in the central 2x2 (visual flair similar to sample)
+        // Palace-style diagonals in the central 2×2 of the rotated grid
         if rows >= 4 && cols >= 4 {
-            let midCols = [cols/2 - 1, cols/2]
-            let midRows = [rows/2 - 1, rows/2]
+            let midCols = [rows/2 - 1, rows/2] // in draw space, x uses rows
+            let midRows = [cols/2 - 1, cols/2] // in draw space, y uses cols
             let p1 = CGPoint(x: boardOrigin.x + CGFloat(midCols.first!) * tileSize,
                              y: boardOrigin.y + CGFloat(midRows.first!) * tileSize)
             let p2 = CGPoint(x: boardOrigin.x + CGFloat(midCols.last! + 1) * tileSize,
@@ -199,22 +345,48 @@ final class GameScene: SKScene {
         dict["row"] = NSNumber(value: position.row)
         container.userData = dict
         container.position = centerPoint(for: position)
+        
+        // Add accessibility label for the piece
+        if piece.isFaceUp {
+            container.accessibilityLabel = "\(piece.color == .red ? "Red" : "Black") \(pieceTypeName(piece.type)) at \(coord(position))"
+        } else {
+            container.accessibilityLabel = "Face down piece at \(coord(position))"
+        }
 
         let radius = tileSize * 0.42
         let base = SKShapeNode(circleOfRadius: radius)
-        // Drop shadow
-        let shadow = SKShapeNode(circleOfRadius: radius)
-        shadow.fillColor = SKColor(white: 0, alpha: 0.25)
+        
+        // Enhanced drop shadow with multiple layers
+        let shadowRadius = radius * 1.05
+        let shadow = SKShapeNode(circleOfRadius: shadowRadius)
+        shadow.fillColor = SKColor(white: 0, alpha: 0.15)
         shadow.strokeColor = .clear
-        shadow.position = CGPoint(x: 0, y: -radius * 0.12)
-        shadow.zPosition = 0.5
+        shadow.position = CGPoint(x: 1, y: -radius * 0.15)
+        shadow.zPosition = 0.3
         container.addChild(shadow)
+        
+        // Inner shadow for depth
+        let innerShadow = SKShapeNode(circleOfRadius: radius * 0.95)
+        innerShadow.fillColor = .clear
+        innerShadow.strokeColor = SKColor(white: 0, alpha: 0.1)
+        innerShadow.lineWidth = 1
+        innerShadow.position = CGPoint(x: 0, y: -1)
+        innerShadow.zPosition = 0.4
+        container.addChild(innerShadow)
 
         base.fillColor = piece.isFaceUp ? SKColor(white: 0.98, alpha: 1) : SKColor(red: 0.10, green: 0.25, blue: 0.63, alpha: 1)
         base.strokeColor = piece.isFaceUp ? SKColor(white: 0.2, alpha: 0.8) : SKColor(white: 0.1, alpha: 0.9)
         base.lineWidth = 2.2
         base.zPosition = 1
         container.addChild(base)
+        
+        // Subtle highlight for depth
+        let highlight = SKShapeNode(circleOfRadius: radius * 0.7)
+        highlight.fillColor = SKColor(white: 1.0, alpha: 0.1)
+        highlight.strokeColor = .clear
+        highlight.position = CGPoint(x: -radius * 0.15, y: radius * 0.15)
+        highlight.zPosition = 1.1
+        container.addChild(highlight)
 
         if piece.isFaceUp {
             // Try to use image asset; fall back to character label
@@ -234,8 +406,8 @@ final class GameScene: SKScene {
         } else {
             // Face down back image if available
             let backName = "piece_back"
-            let texture = SKTexture(imageNamed: backName)
-            if texture.size().width > 2 && texture.size().height > 2 {
+            if let backImage = UIImage(named: backName) {
+                let texture = SKTexture(image: backImage)
                 let sprite = SKSpriteNode(texture: texture)
                 let side = radius * 1.6
                 sprite.size = CGSize(width: side, height: side)
@@ -248,9 +420,10 @@ final class GameScene: SKScene {
     }
 
     private func makePieceSprite(for piece: BanqiPiece, radius: CGFloat) -> SKSpriteNode? {
+        // Only use an image if present to avoid SpriteKit's red-X placeholder
         let name = assetName(for: piece)
-        let texture = SKTexture(imageNamed: name)
-        if texture.size().width <= 2 || texture.size().height <= 2 { return nil }
+        guard let image = UIImage(named: name) else { return nil }
+        let texture = SKTexture(image: image)
         let sprite = SKSpriteNode(texture: texture)
         let side = radius * 1.8
         sprite.size = CGSize(width: side, height: side)
@@ -290,19 +463,48 @@ final class GameScene: SKScene {
         case (.soldier, .black): return "卒"
         }
     }
+    
+    private func pieceTypeName(_ type: BanqiPieceType) -> String {
+        switch type {
+        case .general: return "General"
+        case .advisor: return "Advisor"
+        case .elephant: return "Elephant"
+        case .chariot: return "Chariot"
+        case .horse: return "Horse"
+        case .cannon: return "Cannon"
+        case .soldier: return "Soldier"
+        }
+    }
 
     private func centerPoint(for position: BanqiPosition) -> CGPoint {
-        let x = boardOrigin.x + (CGFloat(position.column) + 0.5) * tileSize
-        let y = boardOrigin.y + (CGFloat(position.row) + 0.5) * tileSize
+        let draw = toDrawGridIndices(from: position)
+        let x = boardOrigin.x + (CGFloat(draw.x) + 0.5) * tileSize
+        let y = boardOrigin.y + (CGFloat(draw.y) + 0.5) * tileSize
         return CGPoint(x: x, y: y)
     }
 
     private func positionFor(point: CGPoint) -> BanqiPosition? {
-        let col = Int((point.x - boardOrigin.x) / tileSize)
-        let row = Int((point.y - boardOrigin.y) / tileSize)
-        let p = BanqiPosition(column: col, row: row)
+        let drawX = Int((point.x - boardOrigin.x) / tileSize)
+        let drawY = Int((point.y - boardOrigin.y) / tileSize)
+        let renderCols = BanqiGame.numberOfRows
+        let renderRows = BanqiGame.numberOfColumns
+        guard drawX >= 0 && drawX < renderCols && drawY >= 0 && drawY < renderRows else { return nil }
+        let p = toBoardPosition(fromDrawX: drawX, drawY: drawY)
         guard game.isInsideBoard(p) else { return nil }
         return p
+    }
+
+    private func toDrawGridIndices(from boardPos: BanqiPosition) -> (x: Int, y: Int) {
+        // Rotate clockwise: drawX grows with original row; drawY grows with inverse of original column
+        let x = boardPos.row
+        let y = BanqiGame.numberOfColumns - 1 - boardPos.column
+        return (x, y)
+    }
+
+    private func toBoardPosition(fromDrawX x: Int, drawY y: Int) -> BanqiPosition {
+        let col = BanqiGame.numberOfColumns - 1 - y
+        let row = x
+        return BanqiPosition(column: col, row: row)
     }
 
     private func gridPosition(from nodes: [SKNode]) -> BanqiPosition? {
@@ -329,6 +531,69 @@ final class GameScene: SKScene {
         if nodesAtPoint.contains(where: { $0 == newGameButton }) {
             resetGame()
             return
+        }
+        
+        // Handle Clear Log button
+        if nodesAtPoint.contains(where: { $0 == clearLogButton }) {
+            moveLog.removeAll()
+            updateLogLabel()
+            return
+        }
+        
+        // Handle Seed Toggle button
+        if nodesAtPoint.contains(where: { $0 == seedToggleButton }) {
+            useDeterministicSeed.toggle()
+            seedToggleButton.text = useDeterministicSeed ? "Deterministic" : "Random"
+            return
+        }
+        
+        // Handle Undo button
+        if nodesAtPoint.contains(where: { $0 == undoButton }) {
+            if currentHistoryIndex > 0 {
+                currentHistoryIndex -= 1
+                restoreGameState()
+            }
+            return
+        }
+        
+        // Handle Redo button
+        if nodesAtPoint.contains(where: { $0 == redoButton }) {
+            if currentHistoryIndex < gameHistory.count - 1 {
+                currentHistoryIndex += 1
+                restoreGameState()
+            }
+            return
+        }
+        
+        // Handle Settings button
+        if nodesAtPoint.contains(where: { $0 == settingsButton }) {
+            showSettingsPanel()
+            return
+        }
+        
+        // Handle Settings panel buttons
+        if settingsPanel.children.count > 0 {
+            for node in nodesAtPoint {
+                if node.name == "closeSettingsButton" {
+                    hideSettingsPanel()
+                    return
+                }
+                if let name = node.name, name.hasPrefix("setting_") {
+                    // Handle setting toggle
+                    hideSettingsPanel()
+                    return
+                }
+            }
+        }
+        
+        // Handle Tutorial overlay
+        if tutorialOverlay.children.count > 0 {
+            for node in nodesAtPoint {
+                if node.name == "startTutorialButton" {
+                    hideTutorialOverlay()
+                    return
+                }
+            }
         }
 
         if let hitPos = gridPosition(from: nodesAtPoint) {
@@ -417,19 +682,19 @@ final class GameScene: SKScene {
 
     private func apply(action: BanqiAction) {
         clearSelection()
+        
+        // Save game state before applying action
+        saveGameState()
+        
         switch action {
         case .flip(let at):
             if game.perform(.flip(at: at)) {
-                // Flip animation: replace node
+                // Flip animation: replace node and scale up uniformly (avoid scaleY=0 bug)
                 removePieceNode(at: at)
                 if let node = makePieceNode(at: at) {
                     node.setScale(0.0)
                     piecesNode.addChild(node)
-                    node.run(SKAction.sequence([
-                        SKAction.scaleX(to: 0.0, duration: 0.0),
-                        SKAction.scaleX(to: 0.0, duration: 0.05),
-                        SKAction.scaleX(to: 1.0, duration: 0.18).withTimingMode(.easeInEaseOut)
-                    ]))
+                    node.run(SKAction.scale(to: 1.0, duration: 0.18).withTimingMode(.easeInEaseOut))
                 }
                 appendLog(.flip(at: at))
             }
@@ -489,14 +754,17 @@ final class GameScene: SKScene {
     private func updateStatus() {
         if game.gameOver {
             if let winner = game.winner {
-                statusLabel.text = winner == .red ? "Red wins" : "Black wins"
+                statusLabel.text = winner == .red ? "Player 1 (Red) wins!" : "Player 2 (Black) wins!"
+                showEndgameBanner(winner: winner)
             } else {
                 statusLabel.text = "Game over"
+                hideEndgameBanner()
             }
             return
         }
+        hideEndgameBanner()
         if let stm = game.sideToMove {
-            statusLabel.text = stm == .red ? "Red to move" : "Black to move"
+            statusLabel.text = stm == .red ? "Player 1 (Red) to move" : "Player 2 (Black) to move"
         } else {
             statusLabel.text = "Tap a tile to flip a piece"
         }
@@ -553,14 +821,321 @@ final class GameScene: SKScene {
         characterFor(piece: piece)
     }
 
+    // MARK: - Endgame banner
+
+    private func showEndgameBanner(winner: BanqiPieceColor) {
+        endgameBanner.removeAllChildren()
+        
+        // Background
+        let background = SKShapeNode(rectOf: CGSize(width: size.width * 0.8, height: 120))
+        background.fillColor = SKColor(white: 0.95, alpha: 0.95)
+        background.strokeColor = winner == .red ? SKColor.red : SKColor.black
+        background.lineWidth = 3
+        background.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        background.zPosition = 10
+        endgameBanner.addChild(background)
+        
+        // Winner text
+        let winnerText = SKLabelNode(fontNamed: "SFUIDisplay-Bold")
+        winnerText.text = winner == .red ? "RED WINS!" : "BLACK WINS!"
+        winnerText.fontSize = 28
+        winnerText.fontColor = winner == .red ? SKColor.red : SKColor.black
+        winnerText.horizontalAlignmentMode = .center
+        winnerText.verticalAlignmentMode = .center
+        winnerText.position = CGPoint(x: size.width / 2, y: size.height / 2 + 10)
+        winnerText.zPosition = 11
+        endgameBanner.addChild(winnerText)
+        
+        // Subtitle
+        let subtitle = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+        subtitle.text = "Tap 'New' to start a new game"
+        subtitle.fontSize = 16
+        subtitle.fontColor = SKColor(white: 0.3, alpha: 1)
+        subtitle.horizontalAlignmentMode = .center
+        subtitle.verticalAlignmentMode = .center
+        subtitle.position = CGPoint(x: size.width / 2, y: size.height / 2 - 20)
+        subtitle.zPosition = 11
+        endgameBanner.addChild(subtitle)
+        
+        // Animate in
+        endgameBanner.alpha = 0
+        endgameBanner.setScale(0.8)
+        let fadeIn = SKAction.fadeIn(withDuration: 0.3)
+        let scaleIn = SKAction.scale(to: 1.0, duration: 0.3)
+        endgameBanner.run(SKAction.group([fadeIn, scaleIn]))
+    }
+    
+    private func hideEndgameBanner() {
+        endgameBanner.removeAllChildren()
+    }
+    
+    // MARK: - Undo/Redo
+    
+    private func saveGameState() {
+        // Remove any future history if we're not at the end
+        if currentHistoryIndex < gameHistory.count - 1 {
+            gameHistory.removeSubrange((currentHistoryIndex + 1)...)
+        }
+        
+        // Create a copy of the current game state
+        let gameCopy = BanqiGame(seed: currentSeed)
+        gameCopy.board = game.board
+        gameCopy.sideToMove = game.sideToMove
+        gameCopy.gameOver = game.gameOver
+        gameCopy.winner = game.winner
+        gameCopy.lastAction = game.lastAction
+        
+        gameHistory.append(gameCopy)
+        currentHistoryIndex = gameHistory.count - 1
+        
+        // Limit history size
+        if gameHistory.count > maxHistorySize {
+            gameHistory.removeFirst()
+            currentHistoryIndex -= 1
+        }
+        
+        updateUndoRedoButtons()
+    }
+    
+    private func restoreGameState() {
+        guard currentHistoryIndex >= 0 && currentHistoryIndex < gameHistory.count else { return }
+        
+        let savedGame = gameHistory[currentHistoryIndex]
+        game.board = savedGame.board
+        game.sideToMove = savedGame.sideToMove
+        game.gameOver = savedGame.gameOver
+        game.winner = savedGame.winner
+        game.lastAction = savedGame.lastAction
+        
+        selectedPosition = nil
+        legalTargets.removeAll()
+        highlightsNode.removeAllChildren()
+        renderAllPieces()
+        updateStatus()
+        updateUndoRedoButtons()
+    }
+    
+    private func updateUndoRedoButtons() {
+        undoButton.fontColor = currentHistoryIndex > 0 ? SKColor(white: 0.4, alpha: 1) : SKColor(white: 0.2, alpha: 0.5)
+        redoButton.fontColor = currentHistoryIndex < gameHistory.count - 1 ? SKColor(white: 0.4, alpha: 1) : SKColor(white: 0.2, alpha: 0.5)
+    }
+    
+    // MARK: - Settings
+    
+    private func showSettingsPanel() {
+        settingsPanel.removeAllChildren()
+        
+        // Background
+        let background = SKShapeNode(rectOf: CGSize(width: size.width * 0.8, height: 300))
+        background.fillColor = SKColor(white: 0.95, alpha: 0.95)
+        background.strokeColor = SKColor(white: 0.2, alpha: 1)
+        background.lineWidth = 2
+        background.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        background.zPosition = 10
+        settingsPanel.addChild(background)
+        
+        // Title
+        let title = SKLabelNode(fontNamed: "SFUIDisplay-Bold")
+        title.text = "Settings"
+        title.fontSize = 24
+        title.fontColor = SKColor(white: 0.1, alpha: 1)
+        title.horizontalAlignmentMode = .center
+        title.verticalAlignmentMode = .center
+        title.position = CGPoint(x: size.width / 2, y: size.height / 2 + 120)
+        title.zPosition = 11
+        settingsPanel.addChild(title)
+        
+        // Close button
+        let closeButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+        closeButton.text = "✕"
+        closeButton.fontSize = 20
+        closeButton.fontColor = SKColor(white: 0.3, alpha: 1)
+        closeButton.horizontalAlignmentMode = .center
+        closeButton.verticalAlignmentMode = .center
+        closeButton.name = "closeSettingsButton"
+        closeButton.zPosition = 11
+        closeButton.position = CGPoint(x: size.width / 2 + 140, y: size.height / 2 + 120)
+        settingsPanel.addChild(closeButton)
+        
+        // Settings options
+        let options = [
+            ("Sound Effects", "🔊"),
+            ("Move Hints", "💡"),
+            ("Show Legal Moves", "🎯"),
+            ("Auto-save", "💾"),
+            ("Board Theme: \(currentBoardTheme)", "🎨"),
+            ("Piece Style: \(currentPieceStyle)", "♟")
+        ]
+        
+        for (index, (text, icon)) in options.enumerated() {
+            let optionButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+            optionButton.text = "\(icon) \(text)"
+            optionButton.fontSize = 16
+            optionButton.fontColor = SKColor(white: 0.3, alpha: 1)
+            optionButton.horizontalAlignmentMode = .left
+            optionButton.verticalAlignmentMode = .center
+            optionButton.name = "setting_\(index)"
+            optionButton.zPosition = 11
+            optionButton.position = CGPoint(x: size.width / 2 - 120, y: size.height / 2 + 60 - CGFloat(index * 30))
+            settingsPanel.addChild(optionButton)
+        }
+        
+        // Animate in
+        settingsPanel.alpha = 0
+        settingsPanel.setScale(0.8)
+        let fadeIn = SKAction.fadeIn(withDuration: 0.3)
+        let scaleIn = SKAction.scale(to: 1.0, duration: 0.3)
+        settingsPanel.run(SKAction.group([fadeIn, scaleIn]))
+    }
+    
+    private func hideSettingsPanel() {
+        let fadeOut = SKAction.fadeOut(withDuration: 0.2)
+        let scaleOut = SKAction.scale(to: 0.8, duration: 0.2)
+        settingsPanel.run(SKAction.group([fadeOut, scaleOut])) {
+            self.settingsPanel.removeAllChildren()
+        }
+    }
+    
+    // MARK: - Tutorial
+    
+    private func showTutorialOverlay() {
+        tutorialOverlay.removeAllChildren()
+        
+        // Background overlay
+        let background = SKShapeNode(rectOf: size)
+        background.fillColor = SKColor(white: 0, alpha: 0.7)
+        background.strokeColor = .clear
+        background.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        background.zPosition = 15
+        tutorialOverlay.addChild(background)
+        
+        // Tutorial content
+        let content = SKNode()
+        content.zPosition = 16
+        tutorialOverlay.addChild(content)
+        
+        // Title
+        let title = SKLabelNode(fontNamed: "SFUIDisplay-Bold")
+        title.text = "Welcome to Chinese Chase!"
+        title.fontSize = 24
+        title.fontColor = SKColor.white
+        title.horizontalAlignmentMode = .center
+        title.verticalAlignmentMode = .center
+        title.position = CGPoint(x: size.width / 2, y: size.height / 2 + 100)
+        content.addChild(title)
+        
+        // Instructions
+        let instructions = [
+            "• Tap face-down pieces to flip them",
+            "• Tap your pieces to select them",
+            "• Tap highlighted squares to move",
+            "• Capture opponent pieces to win",
+            "• Use undo/redo buttons to go back"
+        ]
+        
+        for (index, instruction) in instructions.enumerated() {
+            let label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+            label.text = instruction
+            label.fontSize = 16
+            label.fontColor = SKColor.white
+            label.horizontalAlignmentMode = .center
+            label.verticalAlignmentMode = .center
+            label.position = CGPoint(x: size.width / 2, y: size.height / 2 + 40 - CGFloat(index * 25))
+            content.addChild(label)
+        }
+        
+        // Start button
+        let startButton = SKLabelNode(fontNamed: "SFUIDisplay-Bold")
+        startButton.text = "Start Playing"
+        startButton.fontSize = 18
+        startButton.fontColor = SKColor.white
+        startButton.horizontalAlignmentMode = .center
+        startButton.verticalAlignmentMode = .center
+        startButton.name = "startTutorialButton"
+        startButton.position = CGPoint(x: size.width / 2, y: size.height / 2 - 80)
+        content.addChild(startButton)
+        
+        // Animate in
+        tutorialOverlay.alpha = 0
+        let fadeIn = SKAction.fadeIn(withDuration: 0.5)
+        tutorialOverlay.run(fadeIn)
+    }
+    
+    private func hideTutorialOverlay() {
+        showTutorial = false
+        let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+        tutorialOverlay.run(fadeOut) {
+            self.tutorialOverlay.removeAllChildren()
+        }
+    }
+    
+    // MARK: - UserDefaults
+    
+    private func loadUserDefaults() {
+        let defaults = UserDefaults.standard
+        currentBoardTheme = defaults.string(forKey: "boardTheme") ?? "classic"
+        currentPieceStyle = defaults.string(forKey: "pieceStyle") ?? "characters"
+        showTutorial = defaults.object(forKey: "showTutorial") == nil // Show tutorial on first run
+    }
+    
+    private func saveUserDefaults() {
+        let defaults = UserDefaults.standard
+        defaults.set(currentBoardTheme, forKey: "boardTheme")
+        defaults.set(currentPieceStyle, forKey: "pieceStyle")
+        defaults.set(false, forKey: "showTutorial")
+    }
+    
+    // MARK: - Sound Effects
+    
+    private func playMoveSound() {
+        // Create a simple beep sound for moves
+        let frequency: Float = 800.0
+        let duration: Float = 0.1
+        let sampleRate: Float = 44100.0
+        let frameCount = Int(duration * sampleRate)
+        
+        var audioData = [Float](repeating: 0.0, count: frameCount)
+        for i in 0..<frameCount {
+            let time = Float(i) / sampleRate
+            audioData[i] = sin(2.0 * Float.pi * frequency * time) * 0.3
+        }
+        
+        // Convert to audio buffer and play
+        // Note: This is a simplified implementation. In a real app, you'd use pre-recorded sounds.
+    }
+    
+    private func playCaptureSound() {
+        // Create a lower frequency sound for captures
+        let frequency: Float = 400.0
+        let duration: Float = 0.2
+        let sampleRate: Float = 44100.0
+        let frameCount = Int(duration * sampleRate)
+        
+        var audioData = [Float](repeating: 0.0, count: frameCount)
+        for i in 0..<frameCount {
+            let time = Float(i) / sampleRate
+            audioData[i] = sin(2.0 * Float.pi * frequency * time) * 0.5
+        }
+        
+        // Convert to audio buffer and play
+        // Note: This is a simplified implementation. In a real app, you'd use pre-recorded sounds.
+    }
+
     // MARK: - New game
 
     private func resetGame(seed: UInt64? = nil) {
-        game.reset(seed: seed)
+        let seedToUse = useDeterministicSeed ? currentSeed : nil
+        game.reset(seed: seedToUse)
         selectedPosition = nil
         legalTargets.removeAll()
         moveLog.removeAll()
         highlightsNode.removeAllChildren()
+        
+        // Initialize game history
+        gameHistory.removeAll()
+        currentHistoryIndex = -1
+        saveGameState() // Save initial state
+        
         renderBoard()
         renderAllPieces()
         updateStatus()
