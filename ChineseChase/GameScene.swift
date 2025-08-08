@@ -16,9 +16,11 @@ final class GameScene: SKScene {
     private let game = BanqiGame()
 
     private var boardNode = SKNode()
+    private var gridNode = SKNode()
     private var piecesNode = SKNode()
     private var highlightsNode = SKNode()
     private var statusLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    private var newGameButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
     private var logLabel = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
 
     private var tileSize: CGFloat = 64
@@ -36,6 +38,7 @@ final class GameScene: SKScene {
         highlightsNode.removeAllChildren()
 
         addChild(boardNode)
+        addChild(gridNode)
         addChild(highlightsNode)
         addChild(piecesNode)
 
@@ -55,6 +58,17 @@ final class GameScene: SKScene {
         logLabel.position = CGPoint(x: size.width / 2, y: 12)
         addChild(logLabel)
 
+        // New Game button
+        newGameButton.text = "New"
+        newGameButton.fontSize = 16
+        newGameButton.fontColor = SKColor(white: 0.95, alpha: 1)
+        newGameButton.horizontalAlignmentMode = .left
+        newGameButton.verticalAlignmentMode = .top
+        newGameButton.name = "newGameButton"
+        newGameButton.zPosition = 5
+        newGameButton.position = CGPoint(x: 16, y: size.height - 16)
+        addChild(newGameButton)
+
         layoutBoard()
         renderBoard()
         renderAllPieces()
@@ -65,6 +79,7 @@ final class GameScene: SKScene {
         super.didChangeSize(oldSize)
         statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 12)
         logLabel.position = CGPoint(x: size.width / 2, y: 12)
+        newGameButton.position = CGPoint(x: 16, y: size.height - 16)
         layoutBoard()
         renderBoard()
         positionAllNodes()
@@ -92,18 +107,25 @@ final class GameScene: SKScene {
 
     private func renderBoard() {
         boardNode.removeAllChildren()
+        gridNode.removeAllChildren()
         let cols = BanqiGame.numberOfColumns
         let rows = BanqiGame.numberOfRows
 
-        // Board background
+        // Board background (beige with thick border to match sample)
         let boardRect = CGRect(x: boardOrigin.x, y: boardOrigin.y, width: CGFloat(cols) * tileSize, height: CGFloat(rows) * tileSize)
-        let background = SKShapeNode(rect: boardRect, cornerRadius: 12)
-        background.fillColor = SKColor(red: 0.16, green: 0.15, blue: 0.13, alpha: 1)
-        background.strokeColor = SKColor(white: 1, alpha: 0.08)
-        background.lineWidth = 2
+        let frameOuter = SKShapeNode(rect: boardRect.insetBy(dx: -10, dy: -10))
+        frameOuter.strokeColor = SKColor(white: 0.05, alpha: 1)
+        frameOuter.lineWidth = 6
+        frameOuter.fillColor = .clear
+        boardNode.addChild(frameOuter)
+
+        let background = SKShapeNode(rect: boardRect)
+        background.fillColor = SKColor(red: 0.93, green: 0.90, blue: 0.84, alpha: 1)
+        background.strokeColor = SKColor(white: 0.0, alpha: 0.8)
+        background.lineWidth = 3
         boardNode.addChild(background)
 
-        // Grid tiles
+        // Grid tiles (thin dark lines, beige squares)
         for row in 0..<rows {
             for col in 0..<cols {
                 let rect = CGRect(x: boardOrigin.x + CGFloat(col) * tileSize,
@@ -111,11 +133,34 @@ final class GameScene: SKScene {
                                   width: tileSize,
                                   height: tileSize)
                 let tile = SKShapeNode(rect: rect)
-                let isLight = (row + col) % 2 == 0
-                tile.fillColor = isLight ? SKColor(red: 0.24, green: 0.23, blue: 0.21, alpha: 1) : SKColor(red: 0.21, green: 0.2, blue: 0.18, alpha: 1)
-                tile.strokeColor = SKColor(white: 1, alpha: 0.06)
-                tile.lineWidth = 1
-                boardNode.addChild(tile)
+                tile.fillColor = SKColor(red: 0.94, green: 0.91, blue: 0.86, alpha: 1)
+                tile.strokeColor = SKColor(white: 0.0, alpha: 0.6)
+                tile.lineWidth = 1.2
+                tile.name = "cell_\(col)_\(row)"
+                gridNode.addChild(tile)
+            }
+        }
+
+        // Palace-style diagonals in the central 2x2 (visual flair similar to sample)
+        if rows >= 4 && cols >= 4 {
+            let midCols = [cols/2 - 1, cols/2]
+            let midRows = [rows/2 - 1, rows/2]
+            let p1 = CGPoint(x: boardOrigin.x + CGFloat(midCols.first!) * tileSize,
+                             y: boardOrigin.y + CGFloat(midRows.first!) * tileSize)
+            let p2 = CGPoint(x: boardOrigin.x + CGFloat(midCols.last! + 1) * tileSize,
+                             y: boardOrigin.y + CGFloat(midRows.last! + 1) * tileSize)
+            let p3 = CGPoint(x: p2.x, y: p1.y)
+            let p4 = CGPoint(x: p1.x, y: p2.y)
+            let diag1 = SKShapeNode(path: {
+                let path = CGMutablePath(); path.move(to: p1); path.addLine(to: p2); return path
+            }())
+            let diag2 = SKShapeNode(path: {
+                let path = CGMutablePath(); path.move(to: p3); path.addLine(to: p4); return path
+            }())
+            for d in [diag1, diag2] {
+                d.strokeColor = SKColor(white: 0.0, alpha: 0.6)
+                d.lineWidth = 1.2
+                gridNode.addChild(d)
             }
         }
     }
@@ -157,9 +202,17 @@ final class GameScene: SKScene {
 
         let radius = tileSize * 0.42
         let base = SKShapeNode(circleOfRadius: radius)
-        base.fillColor = piece.isFaceUp ? (piece.color == .red ? SKColor(red: 0.35, green: 0.08, blue: 0.08, alpha: 1) : SKColor(red: 0.09, green: 0.09, blue: 0.1, alpha: 1)) : SKColor(red: 0.16, green: 0.16, blue: 0.16, alpha: 1)
-        base.strokeColor = SKColor(white: 1, alpha: 0.15)
-        base.lineWidth = 2
+        // Drop shadow
+        let shadow = SKShapeNode(circleOfRadius: radius)
+        shadow.fillColor = SKColor(white: 0, alpha: 0.25)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: 0, y: -radius * 0.12)
+        shadow.zPosition = 0.5
+        container.addChild(shadow)
+
+        base.fillColor = piece.isFaceUp ? SKColor(white: 0.98, alpha: 1) : SKColor(red: 0.10, green: 0.25, blue: 0.63, alpha: 1)
+        base.strokeColor = piece.isFaceUp ? SKColor(white: 0.2, alpha: 0.8) : SKColor(white: 0.1, alpha: 0.9)
+        base.lineWidth = 2.2
         base.zPosition = 1
         container.addChild(base)
 
@@ -171,7 +224,7 @@ final class GameScene: SKScene {
             } else {
                 let label = SKLabelNode(fontNamed: "PingFangTC-Semibold")
                 label.fontSize = radius
-                label.fontColor = .white
+                label.fontColor = (piece.color == .red) ? SKColor(red: 0.80, green: 0.10, blue: 0.10, alpha: 1) : SKColor(white: 0.08, alpha: 1)
                 label.verticalAlignmentMode = .center
                 label.horizontalAlignmentMode = .center
                 label.text = characterFor(piece: piece)
@@ -252,13 +305,37 @@ final class GameScene: SKScene {
         return p
     }
 
+    private func gridPosition(from nodes: [SKNode]) -> BanqiPosition? {
+        for node in nodes {
+            if let name = node.name, name.hasPrefix("cell_") {
+                let parts = name.split(separator: "_")
+                if parts.count == 3, let c = Int(parts[1]), let r = Int(parts[2]) {
+                    let pos = BanqiPosition(column: c, row: r)
+                    if game.isInsideBoard(pos) { return pos }
+                }
+            }
+        }
+        return nil
+    }
+
     // MARK: - Touch handling
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
-        guard let gridPos = positionFor(point: location) else { return }
-        handleTap(at: gridPos)
+
+        // Handle New Game button
+        let nodesAtPoint = nodes(at: location)
+        if nodesAtPoint.contains(where: { $0 == newGameButton }) {
+            resetGame()
+            return
+        }
+
+        if let hitPos = gridPosition(from: nodesAtPoint) {
+            handleTap(at: hitPos)
+        } else if let gridPos = positionFor(point: location) {
+            handleTap(at: gridPos)
+        }
     }
 
     private func handleTap(at gridPos: BanqiPosition) {
@@ -474,6 +551,19 @@ final class GameScene: SKScene {
 
     private func charForLog(_ piece: BanqiPiece) -> String {
         characterFor(piece: piece)
+    }
+
+    // MARK: - New game
+
+    private func resetGame(seed: UInt64? = nil) {
+        game.reset(seed: seed)
+        selectedPosition = nil
+        legalTargets.removeAll()
+        moveLog.removeAll()
+        highlightsNode.removeAllChildren()
+        renderBoard()
+        renderAllPieces()
+        updateStatus()
     }
 }
 
