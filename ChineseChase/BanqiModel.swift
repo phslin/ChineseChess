@@ -76,7 +76,11 @@ public final class BanqiGame {
             seeded.dropValues(1024)
             self.randomSource = seeded
         } else {
-            self.randomSource = GKRandomSource.sharedRandom()
+            // Use a more random seed based on current time and random data
+            let randomSeed = UInt64(Date().timeIntervalSince1970 * 1000000) ^ UInt64.random(in: 0...UInt64.max)
+            let seeded = GKARC4RandomSource(seed: dataFromSeed(randomSeed))
+            seeded.dropValues(2048) // Drop more values for better randomness
+            self.randomSource = seeded
         }
         self.board = Array(repeating: Array(repeating: nil, count: BanqiGame.numberOfColumns), count: BanqiGame.numberOfRows)
         self.sideToMove = nil

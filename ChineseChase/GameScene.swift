@@ -9,7 +9,7 @@ import SpriteKit
 import GameplayKit
 import UIKit
 import AVFoundation
-
+    
 final class GameScene: SKScene {
     // Kept for compatibility with template loading from GameViewController
     var entities = [GKEntity]()
@@ -23,13 +23,6 @@ final class GameScene: SKScene {
     private var highlightsNode = SKNode()
     private var statusLabel = SKLabelNode()
     private var newGameButton = SKLabelNode()
-    private var logLabel = SKLabelNode()
-    private var clearLogButton = SKLabelNode()
-    private var seedLabel = SKLabelNode()
-    private var seedToggleButton = SKLabelNode()
-    private var undoButton = SKLabelNode()
-    private var redoButton = SKLabelNode()
-    private var settingsButton = SKLabelNode()
     private var settingsPanel = SKNode()
     private var tutorialOverlay = SKNode()
     // Player labels - more professional game style
@@ -55,16 +48,10 @@ final class GameScene: SKScene {
     private var moveSound: AVAudioPlayer?
     private var captureSound: AVAudioPlayer?
     
-    // Undo/redo system
-    private var gameHistory: [BanqiGame] = []
-    private var currentHistoryIndex = -1
-    private let maxHistorySize = 50
-
     private var tileSize: CGFloat = 64
     private var boardOrigin: CGPoint = .zero
     private var selectedPosition: BanqiPosition?
     private var legalTargets: [BanqiPosition] = []
-    private var moveLog: [String] = []
     private var selectionBorder: SKShapeNode?
 
     override func didMove(to view: SKView) {
@@ -128,17 +115,9 @@ final class GameScene: SKScene {
         statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 8)
         addChild(statusLabel)
         
-        logLabel.fontSize = 13
-        logLabel.fontColor = SKColor(white: 0.15, alpha: 1)
-        logLabel.horizontalAlignmentMode = .center
-        logLabel.verticalAlignmentMode = .bottom
-        logLabel.numberOfLines = 2
-        logLabel.preferredMaxLayoutWidth = size.width * 0.9
-        logLabel.position = CGPoint(x: size.width / 2, y: 10)
-        addChild(logLabel)
 
-        // Save initial game state AFTER game is initialized
-        saveGameState()
+
+
         
         // Set up board
         layoutBoard()
@@ -162,67 +141,13 @@ final class GameScene: SKScene {
         newGameButton.accessibilityHint = "Start a new game"
         addChild(newGameButton)
 
-        // Clear log button
-        clearLogButton.text = "Clear"
-        clearLogButton.fontSize = 14
-        clearLogButton.fontColor = SKColor(white: 0.3, alpha: 1)
-        clearLogButton.horizontalAlignmentMode = .right
-        clearLogButton.verticalAlignmentMode = .bottom
-        clearLogButton.name = "clearLogButton"
-        clearLogButton.zPosition = 5
-        clearLogButton.position = CGPoint(x: size.width - 16, y: 10)
-        addChild(clearLogButton)
 
-        // Seed controls
-        seedLabel.text = "Seed: 12345"
-        seedLabel.fontSize = 12
-        seedLabel.fontColor = SKColor(white: 0.4, alpha: 1)
-        seedLabel.horizontalAlignmentMode = .left
-        seedLabel.verticalAlignmentMode = .bottom
-        seedLabel.position = CGPoint(x: 16, y: 30)
-        addChild(seedLabel)
+
+
         
-        seedToggleButton.text = "Random"
-        seedToggleButton.fontSize = 12
-        seedToggleButton.fontColor = SKColor(white: 0.4, alpha: 1)
-        seedToggleButton.horizontalAlignmentMode = .left
-        seedToggleButton.verticalAlignmentMode = .bottom
-        seedToggleButton.name = "seedToggleButton"
-        seedToggleButton.zPosition = 5
-        seedToggleButton.position = CGPoint(x: 16, y: 50)
-        addChild(seedToggleButton)
+
         
-        // Undo/Redo buttons
-        undoButton.text = "↶"
-        undoButton.fontSize = 16
-        undoButton.fontColor = SKColor(white: 0.4, alpha: 1)
-        undoButton.horizontalAlignmentMode = .center
-        undoButton.verticalAlignmentMode = .bottom
-        undoButton.name = "undoButton"
-        undoButton.zPosition = 5
-        undoButton.position = CGPoint(x: size.width - 60, y: size.height - 16)
-        addChild(undoButton)
-        
-        redoButton.text = "↷"
-        redoButton.fontSize = 16
-        redoButton.fontColor = SKColor(white: 0.4, alpha: 1)
-        redoButton.horizontalAlignmentMode = .center
-        redoButton.verticalAlignmentMode = .bottom
-        redoButton.name = "redoButton"
-        redoButton.zPosition = 5
-        redoButton.position = CGPoint(x: size.width - 40, y: size.height - 16)
-        addChild(redoButton)
-        
-        // Settings button
-        settingsButton.text = "⚙"
-        settingsButton.fontSize = 16
-        settingsButton.fontColor = SKColor(white: 0.4, alpha: 1)
-        settingsButton.horizontalAlignmentMode = .center
-        settingsButton.verticalAlignmentMode = .bottom
-        settingsButton.name = "settingsButton"
-        settingsButton.zPosition = 5
-        settingsButton.position = CGPoint(x: size.width - 80, y: size.height - 16)
-        addChild(settingsButton)
+
         
         // Settings panel
         addChild(settingsPanel)
@@ -239,13 +164,7 @@ final class GameScene: SKScene {
     override func didChangeSize(_ oldSize: CGSize) {
         super.didChangeSize(oldSize)
         statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 12)
-        logLabel.position = CGPoint(x: size.width / 2, y: 12)
         newGameButton.position = CGPoint(x: 16, y: size.height - 16)
-        clearLogButton.position = CGPoint(x: size.width - 16, y: 10)
-        seedLabel.position = CGPoint(x: 16, y: 30)
-        seedToggleButton.position = CGPoint(x: 16, y: 50)
-        undoButton.position = CGPoint(x: size.width - 60, y: size.height - 16)
-        redoButton.position = CGPoint(x: size.width - 40, y: size.height - 16)
         
         // Only update positions if these elements are initialized
         player1Label?.position = CGPoint(x: 80, y: size.height - 40)
@@ -571,7 +490,7 @@ final class GameScene: SKScene {
     }
 
     // MARK: - Touch handling
-
+    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         let location = touch.location(in: self)
@@ -583,43 +502,7 @@ final class GameScene: SKScene {
             return
         }
         
-        // Handle Clear Log button
-        if nodesAtPoint.contains(where: { $0 == clearLogButton }) {
-            moveLog.removeAll()
-            updateLogLabel()
-            return
-        }
-        
-        // Handle Seed Toggle button
-        if nodesAtPoint.contains(where: { $0 == seedToggleButton }) {
-            useDeterministicSeed.toggle()
-            seedToggleButton.text = useDeterministicSeed ? "Deterministic" : "Random"
-            return
-        }
-        
-        // Handle Undo button
-        if nodesAtPoint.contains(where: { $0 == undoButton }) {
-            if currentHistoryIndex > 0 {
-                currentHistoryIndex -= 1
-                restoreGameState()
-            }
-            return
-        }
-        
-        // Handle Redo button
-        if nodesAtPoint.contains(where: { $0 == redoButton }) {
-            if currentHistoryIndex < gameHistory.count - 1 {
-                currentHistoryIndex += 1
-                restoreGameState()
-            }
-            return
-        }
-        
-        // Handle Settings button
-        if nodesAtPoint.contains(where: { $0 == settingsButton }) {
-            showSettingsPanel()
-            return
-        }
+
         
         // Handle Settings panel buttons
         if settingsPanel.children.count > 0 {
@@ -646,10 +529,19 @@ final class GameScene: SKScene {
             }
         }
 
+        // Only handle taps on the board area or on actual pieces
         if let hitPos = gridPosition(from: nodesAtPoint) {
             handleTap(at: hitPos)
         } else if let gridPos = positionFor(point: location) {
-            handleTap(at: gridPos)
+            // Additional safety checks to prevent taps on captured pieces area or outside board
+            let isWithinBoardBounds = location.x >= boardOrigin.x && 
+                                    location.x <= boardOrigin.x + CGFloat(BanqiGame.numberOfRows) * tileSize &&
+                                    location.y >= boardOrigin.y && 
+                                    location.y <= boardOrigin.y + CGFloat(BanqiGame.numberOfColumns) * tileSize
+            
+            if isWithinBoardBounds && (game.piece(at: gridPos) != nil || (selectedPosition != nil && legalTargets.contains(gridPos))) {
+                handleTap(at: gridPos)
+            }
         }
     }
 
@@ -749,9 +641,6 @@ final class GameScene: SKScene {
     private func apply(action: BanqiAction) {
         clearSelection()
         
-        // Save game state before applying action
-        saveGameState()
-        
         switch action {
         case .flip(let at):
             if game.perform(.flip(at: at)) {
@@ -762,19 +651,16 @@ final class GameScene: SKScene {
                     piecesNode.addChild(node)
                     node.run(SKAction.scale(to: 1.0, duration: 0.18).withTimingMode(.easeInEaseOut))
                 }
-                appendLog(.flip(at: at))
             }
         case .move(let from, let to):
             if game.perform(.move(from: from, to: to)) {
                 movePieceNode(from: from, to: to)
                 playMoveSound()
-                appendLog(.move(from: from, to: to))
             }
         case .capture(let from, let to):
             if game.perform(.capture(from: from, to: to)) {
                 capturePieceNode(from: from, to: to)
                 playCaptureSound()
-                appendLog(.capture(from: from, to: to))
             }
         }
         updateStatus()
@@ -877,43 +763,7 @@ final class GameScene: SKScene {
         }
     }
 
-    // MARK: - Move log
 
-    private func appendLog(_ action: BanqiAction) {
-        let entry: String
-        switch action {
-        case .flip(let at):
-            if let p = game.piece(at: at) {
-                entry = "flip \(characterFor(piece: p))@\(coord(at))"
-            } else {
-                entry = "flip@\(coord(at))"
-            }
-        case .move(let from, let to):
-            if let p = game.piece(at: to) {
-                entry = "\(characterFor(piece: p)) \(coord(from))→\(coord(to))"
-            } else {
-                entry = "move \(coord(from))→\(coord(to))"
-            }
-        case .capture(let from, let to):
-            if let p = game.piece(at: to) {
-                entry = "\(characterFor(piece: p)) \(coord(from))×\(coord(to))"
-            } else {
-                entry = "cap \(coord(from))×\(coord(to))"
-            }
-        }
-        moveLog.append(entry)
-        if moveLog.count > 20 { moveLog.removeFirst(moveLog.count - 20) }
-        updateLogLabel()
-    }
-
-    private func updateLogLabel() {
-        let last = moveLog.suffix(8)
-        // Break into two lines for readability
-        let midpoint = (last.count + 1) / 2
-        let top = last.prefix(midpoint).joined(separator: "   ")
-        let bottom = last.suffix(last.count - midpoint).joined(separator: "   ")
-        logLabel.text = bottom.isEmpty ? top : top + "\n" + bottom
-    }
 
     private func coord(_ p: BanqiPosition) -> String {
         let files = ["a", "b", "c", "d"]
@@ -921,10 +771,6 @@ final class GameScene: SKScene {
         // ranks start at 1 from bottom by our coordinate system
         let rank = p.row + 1
         return "\(file)\(rank)"
-    }
-
-    private func charForLog(_ piece: BanqiPiece) -> String {
-        characterFor(piece: piece)
     }
 
     // MARK: - Endgame banner
@@ -975,56 +821,7 @@ final class GameScene: SKScene {
         endgameBanner.removeAllChildren()
     }
     
-    // MARK: - Undo/Redo
-    
-    private func saveGameState() {
-        // Remove any future history if we're not at the end
-        if currentHistoryIndex < gameHistory.count - 1 {
-            gameHistory.removeSubrange((currentHistoryIndex + 1)...)
-        }
-        
-        // Create a copy of the current game state
-        let gameCopy = BanqiGame(seed: currentSeed)
-        gameCopy.board = game.board
-        gameCopy.sideToMove = game.sideToMove
-        gameCopy.gameOver = game.gameOver
-        gameCopy.winner = game.winner
-        gameCopy.lastAction = game.lastAction
-        
-        gameHistory.append(gameCopy)
-        currentHistoryIndex = gameHistory.count - 1
-        
-        // Limit history size
-        if gameHistory.count > maxHistorySize {
-            gameHistory.removeFirst()
-            currentHistoryIndex -= 1
-        }
-        
-        updateUndoRedoButtons()
-    }
-    
-    private func restoreGameState() {
-        guard currentHistoryIndex >= 0 && currentHistoryIndex < gameHistory.count else { return }
-        
-        let savedGame = gameHistory[currentHistoryIndex]
-        game.board = savedGame.board
-        game.sideToMove = savedGame.sideToMove
-        game.gameOver = savedGame.gameOver
-        game.winner = savedGame.winner
-        game.lastAction = savedGame.lastAction
-        
-        selectedPosition = nil
-        legalTargets.removeAll()
-        highlightsNode.removeAllChildren()
-        renderAllPieces()
-        updateStatus()
-        updateCapturedPieces()
-    }
-    
-    private func updateUndoRedoButtons() {
-        undoButton.fontColor = currentHistoryIndex > 0 ? SKColor(white: 0.4, alpha: 1) : SKColor(white: 0.2, alpha: 0.5)
-        redoButton.fontColor = currentHistoryIndex < gameHistory.count - 1 ? SKColor(white: 0.4, alpha: 1) : SKColor(white: 0.2, alpha: 0.5)
-    }
+
     
     // MARK: - Settings
     
@@ -1235,17 +1032,11 @@ final class GameScene: SKScene {
             game = BanqiGame(seed: currentSeed)
         }
         
-        // Clear history and save initial state
-        gameHistory.removeAll()
-        currentHistoryIndex = -1
-        saveGameState()
-        
         // Clear UI
         piecesNode.removeAllChildren()
         highlightsNode.removeAllChildren()
         selectedPosition = nil
         legalTargets = []
-        moveLog.removeAll()
         
         // Reset board
         layoutBoard()
@@ -1254,14 +1045,6 @@ final class GameScene: SKScene {
         positionAllNodes()
         updateStatus()
         updateCapturedPieces()
-        
-        // Load saved styles
-        if let boardStyle = UserDefaults.standard.string(forKey: "boardStyle") {
-            currentBoardTheme = boardStyle
-        }
-        if let pieceStyle = UserDefaults.standard.string(forKey: "pieceStyle") {
-            currentPieceStyle = pieceStyle
-        }
     }
 
     private func updateCapturedPieces() {
