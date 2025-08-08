@@ -1181,7 +1181,7 @@ final class GameScene: SKScene {
         let defaults = UserDefaults.standard
         currentBoardTheme = defaults.string(forKey: "boardTheme") ?? "classic"
         currentPieceStyle = defaults.string(forKey: "pieceStyle") ?? "characters"
-        showTutorial = defaults.object(forKey: "showTutorial") == nil // Show tutorial on first run
+        showTutorial = false // Tutorial disabled
     }
     
     private func saveUserDefaults() {

@@ -317,25 +317,32 @@ public final class BanqiGame {
     }
 
     // Get captured pieces for a specific side
-    func capturedPieces(for side: BanqiPieceColor) -> [BanqiPieceType] {
+    public func capturedPieces(for side: BanqiPieceColor) -> [BanqiPieceType] {
         var captured: [BanqiPieceType] = []
         
-        // Count pieces that should be on board vs actual pieces
-        let expectedPieces: [BanqiPieceType] = [.general, .advisor, .elephant, .horse, .chariot, .cannon, .soldier]
-        let expectedCount = expectedPieces.count
+        // Expected piece counts for each side in Banqi
+        let expectedCounts: [BanqiPieceType: Int] = [
+            .general: 1,
+            .advisor: 2,
+            .elephant: 2,
+            .chariot: 2,
+            .horse: 2,
+            .cannon: 2,
+            .soldier: 5
+        ]
         
-        for pieceType in expectedPieces {
-            var count = 0
+        for (pieceType, expectedCount) in expectedCounts {
+            var actualCount = 0
             for row in 0..<BanqiGame.numberOfRows {
                 for col in 0..<BanqiGame.numberOfColumns {
                     if let piece = board[row][col], piece.color == side, piece.type == pieceType {
-                        count += 1
+                        actualCount += 1
                     }
                 }
             }
             
-            // If we have fewer pieces than expected, they were captured
-            let missing = expectedCount - count
+            // Add missing pieces to captured list
+            let missing = expectedCount - actualCount
             for _ in 0..<missing {
                 captured.append(pieceType)
             }
