@@ -15,7 +15,7 @@ final class GameScene: SKScene {
     var entities = [GKEntity]()
     var graphs = [String: GKGraph]()
 
-    private let game = BanqiGame()
+    private var game: BanqiGame!
 
     private var boardNode = SKNode()
     private var gridNode = SKNode()
@@ -32,8 +32,15 @@ final class GameScene: SKScene {
     private var settingsButton = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
     private var settingsPanel = SKNode()
     private var tutorialOverlay = SKNode()
-    private var player1Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
-    private var player2Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
+    // Player labels - more professional game style
+    private var player1Label: SKLabelNode!
+    private var player2Label: SKLabelNode!
+    private var currentPlayerIndicator: SKShapeNode!
+    
+    // Captured pieces display
+    private var capturedPiecesNode: SKNode!
+    private var capturedRedPieces: [SKNode] = []
+    private var capturedBlackPieces: [SKNode] = []
     private var endgameBanner = SKNode()
     
     private var useDeterministicSeed = false
@@ -176,6 +183,7 @@ final class GameScene: SKScene {
         addChild(settingsPanel)
         
         // Player labels
+        player1Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
         player1Label.text = "Player 1 (Red)"
         player1Label.fontSize = 14
         player1Label.fontColor = SKColor.red
@@ -184,6 +192,7 @@ final class GameScene: SKScene {
         player1Label.position = CGPoint(x: 16, y: size.height - 40)
         addChild(player1Label)
         
+        player2Label = SKLabelNode(fontNamed: "SFUIDisplay-Regular")
         player2Label.text = "Player 2 (Black)"
         player2Label.fontSize = 14
         player2Label.fontColor = SKColor.black
@@ -191,6 +200,12 @@ final class GameScene: SKScene {
         player2Label.verticalAlignmentMode = .top
         player2Label.position = CGPoint(x: 16, y: size.height - 60)
         addChild(player2Label)
+        
+        // Captured pieces display
+        capturedPiecesNode = SKNode()
+        capturedPiecesNode.position = CGPoint(x: size.width / 2, y: 10)
+        capturedPiecesNode.zPosition = 10
+        addChild(capturedPiecesNode)
         
         // Tutorial overlay
         addChild(tutorialOverlay)
@@ -216,10 +231,15 @@ final class GameScene: SKScene {
         seedToggleButton.position = CGPoint(x: 16, y: 50)
         undoButton.position = CGPoint(x: size.width - 60, y: size.height - 16)
         redoButton.position = CGPoint(x: size.width - 40, y: size.height - 16)
+        player1Label.position = CGPoint(x: 80, y: size.height - 40)
+        player2Label.position = CGPoint(x: 80, y: size.height - 60)
+        currentPlayerIndicator.position = CGPoint(x: 60, y: game.sideToMove == .red ? size.height - 40 : size.height - 60)
+        capturedPiecesNode.position = CGPoint(x: 0, y: 0)
         layoutBoard()
         renderBoard()
         positionAllNodes()
         updateStatus()
+        updateCapturedPieces()
     }
 
     // MARK: - Layout
@@ -649,12 +669,28 @@ final class GameScene: SKScene {
             }
         }
         drawHighlights(for: legalTargets)
+        
+        // Add selection border
+        removeSelectionBorder()
+        let border = SKShapeNode(circleOfRadius: tileSize * 0.5)
+        border.strokeColor = SKColor.yellow
+        border.lineWidth = 3
+        border.position = centerPoint(for: position)
+        border.zPosition = 3
+        selectionBorder = border
+        addChild(border)
+    }
+    
+    private func removeSelectionBorder() {
+        selectionBorder?.removeFromParent()
+        selectionBorder = nil
     }
 
     private func clearSelection() {
         selectedPosition = nil
         legalTargets = []
         highlightsNode.removeAllChildren()
+        removeSelectionBorder()
     }
 
     private func drawHighlights(for targets: [BanqiPosition]) {
@@ -701,15 +737,18 @@ final class GameScene: SKScene {
         case .move(let from, let to):
             if game.perform(.move(from: from, to: to)) {
                 movePieceNode(from: from, to: to)
+                playMoveSound()
                 appendLog(.move(from: from, to: to))
             }
         case .capture(let from, let to):
             if game.perform(.capture(from: from, to: to)) {
                 capturePieceNode(from: from, to: to)
+                playCaptureSound()
                 appendLog(.capture(from: from, to: to))
             }
         }
         updateStatus()
+        updateCapturedPieces()
     }
 
     private func removePieceNode(at position: BanqiPosition) {
@@ -730,45 +769,82 @@ final class GameScene: SKScene {
     }
 
     private func movePieceNode(from: BanqiPosition, to: BanqiPosition) {
-        guard let node = nodeFor(position: from) else { return }
-        node.userData?["col"] = NSNumber(value: to.column)
-        node.userData?["row"] = NSNumber(value: to.row)
-        let target = centerPoint(for: to)
-        let move = SKAction.move(to: target, duration: 0.22).withTimingMode(.easeInEaseOut)
-        node.run(move)
+        if let node = nodeFor(position: from) {
+            let moveAction = SKAction.move(to: centerPoint(for: to), duration: 0.25)
+            moveAction.timingMode = .easeInEaseOut
+            node.run(moveAction)
+            
+            // Update position in userData
+            if let userData = node.userData {
+                userData["col"] = NSNumber(value: to.column)
+                userData["row"] = NSNumber(value: to.row)
+            }
+        }
     }
 
     private func capturePieceNode(from: BanqiPosition, to: BanqiPosition) {
-        // Remove target
+        // Remove target with enhanced animation
         if let captured = nodeFor(position: to) {
-            let fade = SKAction.fadeOut(withDuration: 0.15)
-            let scale = SKAction.scale(to: 0.6, duration: 0.15)
-            captured.run(SKAction.group([fade, scale])) { [weak captured] in
+            let fade = SKAction.fadeOut(withDuration: 0.25)
+            let scale = SKAction.scale(to: 0.3, duration: 0.25)
+            let rotate = SKAction.rotate(byAngle: .pi * 2, duration: 0.25)
+            let group = SKAction.group([fade, scale, rotate])
+            captured.run(group) { [weak captured] in
                 captured?.removeFromParent()
             }
         }
-        // Move attacker
-        movePieceNode(from: from, to: to)
+        
+        // Move attacker with bounce effect
+        if let attacker = nodeFor(position: from) {
+            let moveAction = SKAction.move(to: centerPoint(for: to), duration: 0.3)
+            let scaleUp = SKAction.scale(to: 1.2, duration: 0.15)
+            let scaleDown = SKAction.scale(to: 1.0, duration: 0.15)
+            let bounce = SKAction.sequence([scaleUp, scaleDown])
+            let group = SKAction.group([moveAction, bounce])
+            attacker.run(group)
+            
+            // Update position in userData
+            if let userData = attacker.userData {
+                userData["col"] = NSNumber(value: to.column)
+                userData["row"] = NSNumber(value: to.row)
+            }
+        }
     }
 
     private func updateStatus() {
         if game.gameOver {
             if let winner = game.winner {
-                statusLabel.text = winner == .red ? "Player 1 (Red) wins!" : "Player 2 (Black) wins!"
+                statusLabel.text = winner == .red ? "RED ARMY VICTORY!" : "BLACK ARMY VICTORY!"
+                statusLabel.fontColor = winner == .red ? .red : .black
                 showEndgameBanner(winner: winner)
             } else {
-                statusLabel.text = "Game over"
-                hideEndgameBanner()
+                statusLabel.text = "DRAW"
+                statusLabel.fontColor = .darkGray
             }
-            return
-        }
-        hideEndgameBanner()
-        if let stm = game.sideToMove {
-            statusLabel.text = stm == .red ? "Player 1 (Red) to move" : "Player 2 (Black) to move"
         } else {
-            statusLabel.text = "Tap a tile to flip a piece"
+            let currentPlayer = game.sideToMove
+            if let currentPlayer = currentPlayer {
+                statusLabel.text = currentPlayer == .red ? "RED ARMY TO MOVE" : "BLACK ARMY TO MOVE"
+                statusLabel.fontColor = currentPlayer == .red ? .red : .black
+                
+                // Update current player indicator
+                currentPlayerIndicator.fillColor = currentPlayer == .red ? .red : .black
+                currentPlayerIndicator.position = CGPoint(x: 60, y: currentPlayer == .red ? size.height - 40 : size.height - 60)
+                
+                // Update player label colors to show current player
+                player1Label.fontColor = currentPlayer == .red ? .red : .gray
+                player2Label.fontColor = currentPlayer == .black ? .black : .gray
+            } else {
+                statusLabel.text = "FLIP A PIECE TO START"
+                statusLabel.fontColor = .darkGray
+                
+                // Reset player label colors
+                player1Label.fontColor = .gray
+                player2Label.fontColor = .gray
+            }
+            
+            hideEndgameBanner()
         }
-        updateLogLabel()
     }
 
     // MARK: - Move log
@@ -778,19 +854,19 @@ final class GameScene: SKScene {
         switch action {
         case .flip(let at):
             if let p = game.piece(at: at) {
-                entry = "flip \(charForLog(p))@\(coord(at))"
+                entry = "flip \(characterFor(piece: p))@\(coord(at))"
             } else {
                 entry = "flip@\(coord(at))"
             }
         case .move(let from, let to):
             if let p = game.piece(at: to) {
-                entry = "\(charForLog(p)) \(coord(from))→\(coord(to))"
+                entry = "\(characterFor(piece: p)) \(coord(from))→\(coord(to))"
             } else {
                 entry = "move \(coord(from))→\(coord(to))"
             }
         case .capture(let from, let to):
             if let p = game.piece(at: to) {
-                entry = "\(charForLog(p)) \(coord(from))×\(coord(to))"
+                entry = "\(characterFor(piece: p)) \(coord(from))×\(coord(to))"
             } else {
                 entry = "cap \(coord(from))×\(coord(to))"
             }
@@ -1123,22 +1199,92 @@ final class GameScene: SKScene {
 
     // MARK: - New game
 
-    private func resetGame(seed: UInt64? = nil) {
-        let seedToUse = useDeterministicSeed ? currentSeed : nil
-        game.reset(seed: seedToUse)
-        selectedPosition = nil
-        legalTargets.removeAll()
-        moveLog.removeAll()
-        highlightsNode.removeAllChildren()
+    private func resetGame() {
+        game = BanqiGame()
+        if useDeterministicSeed {
+            game = BanqiGame(seed: currentSeed)
+        }
         
-        // Initialize game history
+        // Clear history and save initial state
         gameHistory.removeAll()
         currentHistoryIndex = -1
-        saveGameState() // Save initial state
+        saveGameState()
         
+        // Clear UI
+        piecesNode.removeAllChildren()
+        highlightsNode.removeAllChildren()
+        selectedPosition = nil
+        legalTargets = []
+        moveLog.removeAll()
+        
+        // Reset board
+        layoutBoard()
         renderBoard()
-        renderAllPieces()
+        positionAllNodes()
         updateStatus()
+        updateCapturedPieces()
+        
+        // Load saved styles
+        if let boardStyle = UserDefaults.standard.string(forKey: "boardStyle") {
+            currentBoardTheme = boardStyle
+        }
+        if let pieceStyle = UserDefaults.standard.string(forKey: "pieceStyle") {
+            currentPieceStyle = pieceStyle
+        }
+    }
+
+    private func updateCapturedPieces() {
+        // Clear existing captured pieces
+        capturedPiecesNode.removeAllChildren()
+        capturedRedPieces.removeAll()
+        capturedBlackPieces.removeAll()
+        
+        // Get captured pieces from game state
+        let capturedRed = game.capturedPieces(for: .red)
+        let capturedBlack = game.capturedPieces(for: .black)
+        
+        // Position for captured pieces display (bottom area)
+        let startX: CGFloat = 20
+        let startY: CGFloat = 60
+        let pieceSpacing: CGFloat = 35
+        let rowSpacing: CGFloat = 40
+        
+        // Display captured red pieces (top row)
+        for (index, pieceType) in capturedRed.enumerated() {
+            let pieceNode = makeCapturedPieceNode(type: pieceType, color: .red)
+            pieceNode.position = CGPoint(x: startX + CGFloat(index) * pieceSpacing, y: startY + rowSpacing)
+            capturedPiecesNode.addChild(pieceNode)
+            capturedRedPieces.append(pieceNode)
+        }
+        
+        // Display captured black pieces (bottom row)
+        for (index, pieceType) in capturedBlack.enumerated() {
+            let pieceNode = makeCapturedPieceNode(type: pieceType, color: .black)
+            pieceNode.position = CGPoint(x: startX + CGFloat(index) * pieceSpacing, y: startY)
+            capturedPiecesNode.addChild(pieceNode)
+            capturedBlackPieces.append(pieceNode)
+        }
+    }
+    
+    private func makeCapturedPieceNode(type: BanqiPieceType, color: BanqiPieceColor) -> SKNode {
+        let container = SKNode()
+        
+        // Background circle
+        let background = SKShapeNode(circleOfRadius: 12)
+        background.fillColor = .white
+        background.strokeColor = color == .red ? .red : .black
+        background.lineWidth = 2
+        container.addChild(background)
+        
+        // Chinese character
+        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        label.fontSize = 14
+        label.fontColor = color == .red ? .red : .black
+        label.text = type.symbol
+        label.verticalAlignmentMode = .center
+        container.addChild(label)
+        
+        return container
     }
 }
 

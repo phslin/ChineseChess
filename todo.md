@@ -9,13 +9,15 @@
 - [x] Move log: compact two-line display with coordinates; add clear button
 
 ## Player Experience & UI Enhancements
-- [ ] Remove tutorial dialog on startup
-- [ ] Add Player 1 (Red) and Player 2 (Black) labels
-- [ ] Show current player turn clearly in UI
-- [ ] Add sound effects for capture and move actions
-- [ ] Add enhanced capture animation
-- [ ] Make all animations more smooth and polished
-- [ ] Add selection border around selected chess piece
+- [x] Remove tutorial dialog on startup
+- [x] Add Player 1 (Red) and Player 2 (Black) labels
+- [x] Show current player turn clearly in UI
+- [x] Add sound effects for capture and move actions
+- [x] Add enhanced capture animation
+- [x] Make all animations more smooth and polished
+- [x] Add selection border around selected chess piece
+- [x] Make player labels more professional game-style ("RED ARMY" / "BLACK ARMY")
+- [x] Add captured pieces display area at bottom of board
 
 ## Visuals & Assets
 - [ ] Replace placeholders with high-quality assets in `Assets.xcassets`

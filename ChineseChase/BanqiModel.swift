@@ -27,6 +27,18 @@ public enum BanqiPieceType: Int, Codable, CaseIterable {
     case soldier = 0
 
     public var rank: Int { rawValue }
+    
+    public var symbol: String {
+        switch self {
+        case .general: return "帥"
+        case .advisor: return "仕"
+        case .elephant: return "相"
+        case .chariot: return "俥"
+        case .horse: return "傌"
+        case .cannon: return "炮"
+        case .soldier: return "兵"
+        }
+    }
 }
 
 public struct BanqiPiece: Codable, Equatable {
@@ -302,6 +314,34 @@ public final class BanqiGame {
             gameOver = true
             winner = stm.opponent
         }
+    }
+
+    // Get captured pieces for a specific side
+    func capturedPieces(for side: BanqiPieceColor) -> [BanqiPieceType] {
+        var captured: [BanqiPieceType] = []
+        
+        // Count pieces that should be on board vs actual pieces
+        let expectedPieces: [BanqiPieceType] = [.general, .advisor, .elephant, .horse, .chariot, .cannon, .soldier]
+        let expectedCount = expectedPieces.count
+        
+        for pieceType in expectedPieces {
+            var count = 0
+            for row in 0..<BanqiGame.numberOfRows {
+                for col in 0..<BanqiGame.numberOfColumns {
+                    if let piece = board[row][col], piece.color == side, piece.type == pieceType {
+                        count += 1
+                    }
+                }
+            }
+            
+            // If we have fewer pieces than expected, they were captured
+            let missing = expectedCount - count
+            for _ in 0..<missing {
+                captured.append(pieceType)
+            }
+        }
+        
+        return captured
     }
 }
 
