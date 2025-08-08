@@ -143,6 +143,7 @@ final class GameScene: SKScene {
         // Set up board
         layoutBoard()
         renderBoard()
+        renderAllPieces()
         positionAllNodes()
         
         // Don't call updateStatus or updateCapturedPieces during initialization
@@ -245,22 +246,30 @@ final class GameScene: SKScene {
         seedToggleButton.position = CGPoint(x: 16, y: 50)
         undoButton.position = CGPoint(x: size.width - 60, y: size.height - 16)
         redoButton.position = CGPoint(x: size.width - 40, y: size.height - 16)
-        player1Label.position = CGPoint(x: 80, y: size.height - 40)
-        player2Label.position = CGPoint(x: 80, y: size.height - 60)
         
-        // Fix the crash by properly handling optional game.sideToMove
-        if let currentPlayer = game.sideToMove {
-            currentPlayerIndicator.position = CGPoint(x: 60, y: currentPlayer == .red ? size.height - 40 : size.height - 60)
-        } else {
-            currentPlayerIndicator.position = CGPoint(x: 60, y: size.height - 40) // Default to red position
+        // Only update positions if these elements are initialized
+        player1Label?.position = CGPoint(x: 80, y: size.height - 40)
+        player2Label?.position = CGPoint(x: 80, y: size.height - 60)
+        
+        // Fix the crash by properly handling optional elements and game.sideToMove
+        if let currentPlayerIndicator = currentPlayerIndicator, let game = game {
+            if let currentPlayer = game.sideToMove {
+                currentPlayerIndicator.position = CGPoint(x: 60, y: currentPlayer == .red ? size.height - 40 : size.height - 60)
+            } else {
+                currentPlayerIndicator.position = CGPoint(x: 60, y: size.height - 40) // Default to red position
+            }
         }
         
-        capturedPiecesNode.position = CGPoint(x: 0, y: 0)
+        capturedPiecesNode?.position = CGPoint(x: 0, y: 0)
         layoutBoard()
         renderBoard()
         positionAllNodes()
-        updateStatus()
-        updateCapturedPieces()
+        
+        // Only update if game is initialized
+        if game != nil {
+            updateStatus()
+            updateCapturedPieces()
+        }
     }
 
     // MARK: - Layout
@@ -1241,6 +1250,7 @@ final class GameScene: SKScene {
         // Reset board
         layoutBoard()
         renderBoard()
+        renderAllPieces()
         positionAllNodes()
         updateStatus()
         updateCapturedPieces()
