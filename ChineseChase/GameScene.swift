@@ -28,7 +28,7 @@ final class GameScene: SKScene {
     // Player labels - more professional game style
     private var player1Label: SKLabelNode!
     private var player2Label: SKLabelNode!
-    private var currentPlayerIndicator: SKShapeNode!
+    private var currentPlayerIndicator: SKNode!
     
     // Captured pieces display
     private var capturedPiecesNode: SKNode!
@@ -75,26 +75,29 @@ final class GameScene: SKScene {
         addChild(piecesNode)
         addChild(endgameBanner)
 
-        // Initialize player labels
+        // Initialize player labels with modern card-style design
         player1Label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        player1Label.fontSize = 16
-        player1Label.fontColor = .red
+        player1Label.fontSize = 20
+        player1Label.fontColor = .white
         player1Label.text = "RED ARMY"
-        player1Label.position = CGPoint(x: 80, y: size.height - 40)
+        player1Label.horizontalAlignmentMode = .center
+        player1Label.position = CGPoint(x: size.width * 0.25, y: size.height - 50)
+        player1Label.zPosition = 2
         addChild(player1Label)
         
         player2Label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        player2Label.fontSize = 16
-        player2Label.fontColor = .black
+        player2Label.fontSize = 20
+        player2Label.fontColor = .white
         player2Label.text = "BLACK ARMY"
-        player2Label.position = CGPoint(x: 80, y: size.height - 60)
+        player2Label.horizontalAlignmentMode = .center
+        player2Label.position = CGPoint(x: size.width * 0.75, y: size.height - 50)
+        player2Label.zPosition = 2
         addChild(player2Label)
         
-        // Initialize current player indicator
-        currentPlayerIndicator = SKShapeNode(rectOf: CGSize(width: 12, height: 12))
-        currentPlayerIndicator.fillColor = .red
-        currentPlayerIndicator.strokeColor = .clear
-        currentPlayerIndicator.position = CGPoint(x: 60, y: size.height - 40)
+        // Initialize current player indicator - modern card design
+        currentPlayerIndicator = createPlayerCard(isActive: true, isRed: true)
+        currentPlayerIndicator.position = CGPoint(x: size.width * 0.25, y: size.height - 50)
+        currentPlayerIndicator.alpha = 0 // Hidden initially
         addChild(currentPlayerIndicator)
         
         // Initialize captured pieces display
@@ -128,17 +131,25 @@ final class GameScene: SKScene {
         // Don't call updateStatus or updateCapturedPieces during initialization
         // They will be called when needed
         
-        // New Game button
-        newGameButton.text = "New"
-        newGameButton.fontSize = 16
-        newGameButton.fontColor = SKColor(white: 0.1, alpha: 1)
-        newGameButton.horizontalAlignmentMode = .left
-        newGameButton.verticalAlignmentMode = .top
+        // New Game button with modern design
+        newGameButton.text = "NEW GAME"
+        newGameButton.fontSize = 18
+        newGameButton.fontColor = .white
+        newGameButton.fontName = "AvenirNext-Bold"
+        newGameButton.horizontalAlignmentMode = .center
+        newGameButton.verticalAlignmentMode = .center
         newGameButton.name = "newGameButton"
-        newGameButton.zPosition = 5
-        newGameButton.position = CGPoint(x: 16, y: size.height - 10)
+        newGameButton.zPosition = 12
+        newGameButton.position = CGPoint(x: 100, y: size.height - 30)
         newGameButton.accessibilityLabel = "New Game"
         newGameButton.accessibilityHint = "Start a new game"
+        
+        // Create button background
+        let newGameBackground = createNewGameButton()
+        newGameBackground.position = CGPoint(x: 100, y: size.height - 30)
+        newGameBackground.name = "newGameButton"
+        newGameBackground.zPosition = 10
+        addChild(newGameBackground)
         addChild(newGameButton)
 
 
@@ -164,18 +175,25 @@ final class GameScene: SKScene {
     override func didChangeSize(_ oldSize: CGSize) {
         super.didChangeSize(oldSize)
         statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 12)
-        newGameButton.position = CGPoint(x: 16, y: size.height - 16)
+        newGameButton.position = CGPoint(x: 100, y: size.height - 30)
+        
+        // Update new game button background position
+        for child in children {
+            if child.name == "newGameButton" && child != newGameButton {
+                child.position = CGPoint(x: 100, y: size.height - 30)
+            }
+        }
         
         // Only update positions if these elements are initialized
-        player1Label?.position = CGPoint(x: 80, y: size.height - 40)
-        player2Label?.position = CGPoint(x: 80, y: size.height - 60)
+        player1Label?.position = CGPoint(x: size.width * 0.25, y: size.height - 50)
+        player2Label?.position = CGPoint(x: size.width * 0.75, y: size.height - 50)
         
-        // Fix the crash by properly handling optional elements and game.sideToMove
+        // Update player indicator position if game and indicator exist
         if let currentPlayerIndicator = currentPlayerIndicator, let game = game {
             if let currentPlayer = game.sideToMove {
-                currentPlayerIndicator.position = CGPoint(x: 60, y: currentPlayer == .red ? size.height - 40 : size.height - 60)
+                currentPlayerIndicator.position = CGPoint(x: currentPlayer == .red ? size.width * 0.25 : size.width * 0.75, y: size.height - 50)
             } else {
-                currentPlayerIndicator.position = CGPoint(x: 60, y: size.height - 40) // Default to red position
+                currentPlayerIndicator.position = CGPoint(x: size.width * 0.25, y: size.height - 50) // Default to red position
             }
         }
         
@@ -744,8 +762,7 @@ final class GameScene: SKScene {
                 statusLabel.fontColor = currentPlayer == .red ? .red : .black
                 
                 // Update current player indicator
-                currentPlayerIndicator.fillColor = currentPlayer == .red ? .red : .black
-                currentPlayerIndicator.position = CGPoint(x: 60, y: currentPlayer == .red ? size.height - 40 : size.height - 60)
+                updatePlayerIndicator(for: currentPlayer)
                 
                 // Update player label colors to show current player
                 player1Label.fontColor = currentPlayer == .red ? .red : .gray
@@ -753,6 +770,10 @@ final class GameScene: SKScene {
             } else {
                 statusLabel.text = "FLIP A PIECE TO START"
                 statusLabel.fontColor = .darkGray
+                
+                // Hide the border when no player is active
+                currentPlayerIndicator.alpha = 0
+                currentPlayerIndicator.removeAllActions() // Stop pulsing animation
                 
                 // Reset player label colors
                 player1Label.fontColor = .gray
@@ -771,6 +792,143 @@ final class GameScene: SKScene {
         // ranks start at 1 from bottom by our coordinate system
         let rank = p.row + 1
         return "\(file)\(rank)"
+    }
+    
+    private func createPlayerCard(isActive: Bool, isRed: Bool) -> SKNode {
+        let container = SKNode()
+        
+        // Card dimensions
+        let cardWidth: CGFloat = 180
+        let cardHeight: CGFloat = 50
+        let cornerRadius: CGFloat = 25
+        
+        // Shadow layer (behind the card)
+        let shadow = SKShapeNode(rectOf: CGSize(width: cardWidth + 4, height: cardHeight + 4), cornerRadius: cornerRadius + 2)
+        shadow.fillColor = SKColor(white: 0, alpha: 0.3)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: 2, y: -2)
+        shadow.zPosition = 0
+        container.addChild(shadow)
+        
+        // Main card background
+        let card = SKShapeNode(rectOf: CGSize(width: cardWidth, height: cardHeight), cornerRadius: cornerRadius)
+        
+        if isActive {
+            // Active player: vibrant gradient-like effect
+            card.fillColor = isRed ? 
+                SKColor(red: 0.9, green: 0.2, blue: 0.2, alpha: 1.0) : 
+                SKColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
+            card.strokeColor = .white
+            card.lineWidth = 3
+            
+            // Add inner glow effect
+            let innerGlow = SKShapeNode(rectOf: CGSize(width: cardWidth - 8, height: cardHeight - 8), cornerRadius: cornerRadius - 4)
+            innerGlow.fillColor = .clear
+            innerGlow.strokeColor = SKColor(white: 1.0, alpha: 0.5)
+            innerGlow.lineWidth = 2
+            innerGlow.zPosition = 1.1
+            container.addChild(innerGlow)
+        } else {
+            // Inactive player: muted design
+            card.fillColor = SKColor(white: 0.4, alpha: 0.7)
+            card.strokeColor = SKColor(white: 0.6, alpha: 0.8)
+            card.lineWidth = 2
+        }
+        
+        card.zPosition = 1
+        container.addChild(card)
+        
+        // Add decorative corner elements for active player
+        if isActive {
+            let cornerSize: CGFloat = 8
+            let cornerColor = SKColor(white: 1.0, alpha: 0.8)
+            
+            // Top corners
+            let topLeft = SKShapeNode(rectOf: CGSize(width: cornerSize, height: 2))
+            topLeft.fillColor = cornerColor
+            topLeft.strokeColor = .clear
+            topLeft.position = CGPoint(x: -cardWidth/2 + cornerSize/2 + 8, y: cardHeight/2 - 6)
+            topLeft.zPosition = 1.2
+            container.addChild(topLeft)
+            
+            let topRight = SKShapeNode(rectOf: CGSize(width: cornerSize, height: 2))
+            topRight.fillColor = cornerColor
+            topRight.strokeColor = .clear
+            topRight.position = CGPoint(x: cardWidth/2 - cornerSize/2 - 8, y: cardHeight/2 - 6)
+            topRight.zPosition = 1.2
+            container.addChild(topRight)
+            
+            // Bottom corners
+            let bottomLeft = SKShapeNode(rectOf: CGSize(width: cornerSize, height: 2))
+            bottomLeft.fillColor = cornerColor
+            bottomLeft.strokeColor = .clear
+            bottomLeft.position = CGPoint(x: -cardWidth/2 + cornerSize/2 + 8, y: -cardHeight/2 + 6)
+            bottomLeft.zPosition = 1.2
+            container.addChild(bottomLeft)
+        }
+        
+        return container
+    }
+    
+    private func createNewGameButton() -> SKNode {
+        let container = SKNode()
+        
+        // Button dimensions
+        let buttonWidth: CGFloat = 140
+        let buttonHeight: CGFloat = 40
+        let cornerRadius: CGFloat = 20
+        
+        // Shadow layer
+        let shadow = SKShapeNode(rectOf: CGSize(width: buttonWidth + 4, height: buttonHeight + 4), cornerRadius: cornerRadius + 2)
+        shadow.fillColor = SKColor(white: 0, alpha: 0.4)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: 2, y: -2)
+        shadow.zPosition = 0
+        container.addChild(shadow)
+        
+        // Main button background with gradient-like effect
+        let button = SKShapeNode(rectOf: CGSize(width: buttonWidth, height: buttonHeight), cornerRadius: cornerRadius)
+        button.fillColor = SKColor(red: 0.2, green: 0.6, blue: 0.9, alpha: 1.0) // Modern blue
+        button.strokeColor = .white
+        button.lineWidth = 2
+        button.zPosition = 1
+        container.addChild(button)
+        
+        // Inner highlight for depth
+        let highlight = SKShapeNode(rectOf: CGSize(width: buttonWidth - 6, height: buttonHeight - 6), cornerRadius: cornerRadius - 3)
+        highlight.fillColor = .clear
+        highlight.strokeColor = SKColor(white: 1.0, alpha: 0.3)
+        highlight.lineWidth = 1
+        highlight.zPosition = 1.1
+        container.addChild(highlight)
+        
+        // Top accent line for modern look
+        let accentLine = SKShapeNode(rectOf: CGSize(width: buttonWidth - 20, height: 2), cornerRadius: 1)
+        accentLine.fillColor = SKColor(white: 1.0, alpha: 0.6)
+        accentLine.strokeColor = .clear
+        accentLine.position = CGPoint(x: 0, y: buttonHeight/2 - 8)
+        accentLine.zPosition = 1.2
+        container.addChild(accentLine)
+        
+        return container
+    }
+    
+    private func updatePlayerIndicator(for currentPlayer: BanqiPieceColor) {
+        // Remove old indicator
+        currentPlayerIndicator.removeFromParent()
+        
+        // Create new indicator
+        currentPlayerIndicator = createPlayerCard(isActive: true, isRed: currentPlayer == .red)
+        currentPlayerIndicator.position = CGPoint(x: currentPlayer == .red ? size.width * 0.25 : size.width * 0.75, y: size.height - 50)
+        currentPlayerIndicator.alpha = 1
+        addChild(currentPlayerIndicator)
+        
+        // Add subtle pulsing animation
+        let pulse = SKAction.sequence([
+            SKAction.scale(to: 1.05, duration: 0.8),
+            SKAction.scale(to: 1.0, duration: 0.8)
+        ])
+        currentPlayerIndicator.run(SKAction.repeatForever(pulse))
     }
 
     // MARK: - Endgame banner
