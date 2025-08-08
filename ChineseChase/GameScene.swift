@@ -28,7 +28,7 @@ final class GameScene: SKScene {
     // Player labels - more professional game style
     private var player1Label: SKLabelNode!
     private var player2Label: SKLabelNode!
-    private var currentPlayerIndicator: SKNode!
+    private var currentPlayerIndicator: SKShapeNode!
     
     // Captured pieces display
     private var capturedPiecesNode: SKNode!
@@ -75,28 +75,28 @@ final class GameScene: SKScene {
         addChild(piecesNode)
         addChild(endgameBanner)
 
-        // Initialize player labels with modern card-style design
+        // Initialize player labels - simple and clean
         player1Label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        player1Label.fontSize = 20
-        player1Label.fontColor = .white
+        player1Label.fontSize = 24
+        player1Label.fontColor = .red
         player1Label.text = "RED ARMY"
         player1Label.horizontalAlignmentMode = .center
         player1Label.position = CGPoint(x: size.width * 0.25, y: size.height - 50)
-        player1Label.zPosition = 2
         addChild(player1Label)
         
         player2Label = SKLabelNode(fontNamed: "AvenirNext-Bold")
-        player2Label.fontSize = 20
-        player2Label.fontColor = .white
+        player2Label.fontSize = 24
+        player2Label.fontColor = .black
         player2Label.text = "BLACK ARMY"
         player2Label.horizontalAlignmentMode = .center
         player2Label.position = CGPoint(x: size.width * 0.75, y: size.height - 50)
-        player2Label.zPosition = 2
         addChild(player2Label)
         
-        // Initialize current player indicator - modern card design
-        currentPlayerIndicator = createPlayerCard(isActive: true, isRed: true)
-        currentPlayerIndicator.position = CGPoint(x: size.width * 0.25, y: size.height - 50)
+        // Initialize simple underline indicator for active player
+        currentPlayerIndicator = SKShapeNode(rectOf: CGSize(width: 120, height: 4))
+        currentPlayerIndicator.fillColor = .red
+        currentPlayerIndicator.strokeColor = .clear
+        currentPlayerIndicator.position = CGPoint(x: size.width * 0.25, y: size.height - 65)
         currentPlayerIndicator.alpha = 0 // Hidden initially
         addChild(currentPlayerIndicator)
         
@@ -191,9 +191,9 @@ final class GameScene: SKScene {
         // Update player indicator position if game and indicator exist
         if let currentPlayerIndicator = currentPlayerIndicator, let game = game {
             if let currentPlayer = game.sideToMove {
-                currentPlayerIndicator.position = CGPoint(x: currentPlayer == .red ? size.width * 0.25 : size.width * 0.75, y: size.height - 50)
+                currentPlayerIndicator.position = CGPoint(x: currentPlayer == .red ? size.width * 0.25 : size.width * 0.75, y: size.height - 65)
             } else {
-                currentPlayerIndicator.position = CGPoint(x: size.width * 0.25, y: size.height - 50) // Default to red position
+                currentPlayerIndicator.position = CGPoint(x: size.width * 0.25, y: size.height - 65) // Default to red position
             }
         }
         
@@ -761,8 +761,10 @@ final class GameScene: SKScene {
                 statusLabel.text = currentPlayer == .red ? "RED ARMY TO MOVE" : "BLACK ARMY TO MOVE"
                 statusLabel.fontColor = currentPlayer == .red ? .red : .black
                 
-                // Update current player indicator
-                updatePlayerIndicator(for: currentPlayer)
+                // Update current player indicator - simple underline
+                currentPlayerIndicator.fillColor = currentPlayer == .red ? .red : .black
+                currentPlayerIndicator.position = CGPoint(x: currentPlayer == .red ? size.width * 0.25 : size.width * 0.75, y: size.height - 65)
+                currentPlayerIndicator.alpha = 1
                 
                 // Update player label colors to show current player
                 player1Label.fontColor = currentPlayer == .red ? .red : .gray
@@ -771,9 +773,8 @@ final class GameScene: SKScene {
                 statusLabel.text = "FLIP A PIECE TO START"
                 statusLabel.fontColor = .darkGray
                 
-                // Hide the border when no player is active
+                // Hide the underline when no player is active
                 currentPlayerIndicator.alpha = 0
-                currentPlayerIndicator.removeAllActions() // Stop pulsing animation
                 
                 // Reset player label colors
                 player1Label.fontColor = .gray
@@ -913,23 +914,7 @@ final class GameScene: SKScene {
         return container
     }
     
-    private func updatePlayerIndicator(for currentPlayer: BanqiPieceColor) {
-        // Remove old indicator
-        currentPlayerIndicator.removeFromParent()
-        
-        // Create new indicator
-        currentPlayerIndicator = createPlayerCard(isActive: true, isRed: currentPlayer == .red)
-        currentPlayerIndicator.position = CGPoint(x: currentPlayer == .red ? size.width * 0.25 : size.width * 0.75, y: size.height - 50)
-        currentPlayerIndicator.alpha = 1
-        addChild(currentPlayerIndicator)
-        
-        // Add subtle pulsing animation
-        let pulse = SKAction.sequence([
-            SKAction.scale(to: 1.05, duration: 0.8),
-            SKAction.scale(to: 1.0, duration: 0.8)
-        ])
-        currentPlayerIndicator.run(SKAction.repeatForever(pulse))
-    }
+
 
     // MARK: - Endgame banner
 
