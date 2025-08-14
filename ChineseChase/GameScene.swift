@@ -183,6 +183,13 @@ final class GameScene: SKScene {
         mainMenuButton.position = CGPoint(x: 100, y: size.height - 60)
         mainMenuButton.accessibilityLabel = "Main Menu"
         mainMenuButton.accessibilityHint = "Return to main menu"
+        
+        // Create main menu button background
+        let mainMenuBackground = createMainMenuButton()
+        mainMenuBackground.position = CGPoint(x: 100, y: size.height - 60)
+        mainMenuBackground.name = "mainMenuButton"
+        mainMenuBackground.zPosition = 10
+        addChild(mainMenuBackground)
         addChild(mainMenuButton)
 
 
@@ -211,10 +218,13 @@ final class GameScene: SKScene {
         newGameButton.position = CGPoint(x: 100, y: size.height - 30)
         mainMenuButton?.position = CGPoint(x: 100, y: size.height - 60)
         
-        // Update new game button background position
+        // Update button background positions
         for child in children {
             if child.name == "newGameButton" && child != newGameButton {
                 child.position = CGPoint(x: 100, y: size.height - 30)
+            }
+            if child.name == "mainMenuButton" && child != mainMenuButton {
+                child.position = CGPoint(x: 100, y: size.height - 60)
             }
         }
         
@@ -962,6 +972,48 @@ final class GameScene: SKScene {
         return container
     }
     
+    private func createMainMenuButton() -> SKNode {
+        let container = SKNode()
+        
+        // Button dimensions
+        let buttonWidth: CGFloat = 140
+        let buttonHeight: CGFloat = 40
+        let cornerRadius: CGFloat = 20
+        
+        // Shadow layer
+        let shadow = SKShapeNode(rectOf: CGSize(width: buttonWidth + 4, height: buttonHeight + 4), cornerRadius: cornerRadius + 2)
+        shadow.fillColor = SKColor(white: 0, alpha: 0.4)
+        shadow.strokeColor = .clear
+        shadow.position = CGPoint(x: 2, y: -2)
+        shadow.zPosition = 0
+        container.addChild(shadow)
+        
+        // Main button background with gray/neutral color
+        let button = SKShapeNode(rectOf: CGSize(width: buttonWidth, height: buttonHeight), cornerRadius: cornerRadius)
+        button.fillColor = SKColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0) // Professional gray
+        button.strokeColor = .white
+        button.lineWidth = 2
+        button.zPosition = 1
+        container.addChild(button)
+        
+        // Inner highlight for depth
+        let highlight = SKShapeNode(rectOf: CGSize(width: buttonWidth - 6, height: buttonHeight - 6), cornerRadius: cornerRadius - 3)
+        highlight.fillColor = .clear
+        highlight.strokeColor = SKColor(white: 1.0, alpha: 0.3)
+        highlight.lineWidth = 1
+        highlight.zPosition = 1.1
+        container.addChild(highlight)
+        
+        // Top accent line for modern look
+        let accentLine = SKShapeNode(rectOf: CGSize(width: buttonWidth - 20, height: 2), cornerRadius: 1)
+        accentLine.fillColor = SKColor(white: 1.0, alpha: 0.6)
+        accentLine.strokeColor = .clear
+        accentLine.position = CGPoint(x: 0, y: buttonHeight/2 - 8)
+        accentLine.zPosition = 1.2
+        container.addChild(accentLine)
+        
+        return container
+    }
 
 
     // MARK: - Endgame banner

@@ -14,9 +14,9 @@ class GameViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        // Present a programmatic GameScene sized to the view and set to resize with it
+        // Present the main menu scene first
         if let skView = self.view as? SKView {
-            let sceneNode = GameScene(size: skView.bounds.size)
+            let sceneNode = MainMenuScene(size: skView.bounds.size)
             sceneNode.scaleMode = .resizeFill
             skView.ignoresSiblingOrder = true
             skView.showsFPS = true

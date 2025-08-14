@@ -112,13 +112,14 @@ public class DifficultySelectionScene: SKScene {
     /// Creates a difficulty selection button
     private func createDifficultyButton(difficulty: AIDifficulty, position: CGPoint, isSelected: Bool) -> SKNode {
         let button = SKNode()
+        button.position = position
         
         // Background
         let background = SKShapeNode(rectOf: CGSize(width: 280, height: 60), cornerRadius: 8)
         background.fillColor = isSelected ? difficulty.color.withAlphaComponent(0.2) : difficulty.color.withAlphaComponent(0.1)
         background.strokeColor = difficulty.color
         background.lineWidth = isSelected ? 3 : 2
-        background.position = position
+        background.position = CGPoint.zero
         
         // Main text
         let mainLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -148,13 +149,14 @@ public class DifficultySelectionScene: SKScene {
     /// Creates a color selection button
     private func createColorButton(color: BanqiPieceColor, text: String, description: String, position: CGPoint, isSelected: Bool) -> SKNode {
         let button = SKNode()
+        button.position = position
         
         // Background
         let background = SKShapeNode(rectOf: CGSize(width: 200, height: 80), cornerRadius: 8)
         background.fillColor = isSelected ? color.uiColor.withAlphaComponent(0.2) : color.uiColor.withAlphaComponent(0.1)
         background.strokeColor = color.uiColor
         background.lineWidth = isSelected ? 3 : 2
-        background.position = position
+        background.position = CGPoint.zero
         
         // Main text
         let mainLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -184,13 +186,14 @@ public class DifficultySelectionScene: SKScene {
     /// Creates a general button
     private func createButton(text: String, description: String, position: CGPoint, color: SKColor) -> SKNode {
         let button = SKNode()
+        button.position = position
         
         // Background
         let background = SKShapeNode(rectOf: CGSize(width: 200, height: 60), cornerRadius: 8)
         background.fillColor = color.withAlphaComponent(0.1)
         background.strokeColor = color
         background.lineWidth = 2
-        background.position = position
+        background.position = CGPoint.zero
         
         // Main text
         let mainLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
