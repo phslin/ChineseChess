@@ -16,6 +16,7 @@ final class GameScene: SKScene {
     var graphs = [String: GKGraph]()
 
     private var game: BanqiGame!
+    private var gameModeManager = GameModeManager.shared
 
     private var boardNode = SKNode()
     private var gridNode = SKNode()
@@ -39,6 +40,16 @@ final class GameScene: SKScene {
     private var useDeterministicSeed = false
     private var currentSeed: UInt64 = 12345
     private var showTutorial = false
+    
+    // Game mode tracking
+    private var currentGameMode: GameMode = .twoPlayer
+    
+    // AI integration
+    private var isAITurn = false
+    private var aiThinkingIndicator: SKNode?
+    
+    // Menu integration
+    private var mainMenuButton: SKLabelNode!
     
     // Style toggles
     private var currentBoardTheme = "classic"
@@ -110,6 +121,13 @@ final class GameScene: SKScene {
         if useDeterministicSeed {
             game = BanqiGame(seed: currentSeed)
         }
+        
+        // Set up single player mode if selected
+        if currentGameMode == .singlePlayer {
+            let ai = gameModeManager.createAI()
+            let humanPlayer = gameModeManager.getCurrentHumanPlayer()
+            game.setupSinglePlayerMode(mode: .singlePlayer, humanPlayer: humanPlayer, ai: ai)
+        }
 
         statusLabel.fontSize = 18
         statusLabel.fontColor = SKColor(white: 0.1, alpha: 1)
@@ -151,6 +169,21 @@ final class GameScene: SKScene {
         newGameBackground.zPosition = 10
         addChild(newGameBackground)
         addChild(newGameButton)
+        
+        // Main Menu button
+        mainMenuButton = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        mainMenuButton.text = "MAIN MENU"
+        mainMenuButton.fontSize = 18
+        mainMenuButton.fontColor = .white
+        mainMenuButton.fontName = "AvenirNext-Bold"
+        mainMenuButton.horizontalAlignmentMode = .center
+        mainMenuButton.verticalAlignmentMode = .center
+        mainMenuButton.name = "mainMenuButton"
+        mainMenuButton.zPosition = 12
+        mainMenuButton.position = CGPoint(x: 100, y: size.height - 60)
+        mainMenuButton.accessibilityLabel = "Main Menu"
+        mainMenuButton.accessibilityHint = "Return to main menu"
+        addChild(mainMenuButton)
 
 
 
@@ -176,6 +209,7 @@ final class GameScene: SKScene {
         super.didChangeSize(oldSize)
         statusLabel.position = CGPoint(x: size.width / 2, y: size.height - 12)
         newGameButton.position = CGPoint(x: 100, y: size.height - 30)
+        mainMenuButton?.position = CGPoint(x: 100, y: size.height - 60)
         
         // Update new game button background position
         for child in children {
@@ -520,6 +554,12 @@ final class GameScene: SKScene {
             return
         }
         
+        // Handle Main Menu button
+        if nodesAtPoint.contains(where: { $0 == mainMenuButton }) {
+            handleMainMenuSelection()
+            return
+        }
+        
 
         
         // Handle Settings panel buttons
@@ -683,6 +723,14 @@ final class GameScene: SKScene {
         }
         updateStatus()
         updateCapturedPieces()
+        
+        // Check for game end
+        if game.gameOver {
+            handleGameEnd()
+        } else if currentGameMode == .singlePlayer && game.isAITurn {
+            // Handle AI turn
+            handleAIMove()
+        }
     }
 
     private func removePieceNode(at position: BanqiPosition) {
@@ -1122,6 +1170,9 @@ final class GameScene: SKScene {
         currentBoardTheme = defaults.string(forKey: "boardTheme") ?? "classic"
         currentPieceStyle = defaults.string(forKey: "pieceStyle") ?? "characters"
         showTutorial = false // Tutorial disabled
+        
+        // Load game mode
+        currentGameMode = gameModeManager.getCurrentGameMode()
     }
     
     private func saveUserDefaults() {
@@ -1167,6 +1218,170 @@ final class GameScene: SKScene {
         // Note: This is a simplified implementation. In a real app, you'd use pre-recorded sounds.
     }
 
+    // MARK: - Menu Integration
+    
+    /// Handles main menu selection
+    private func handleMainMenuSelection() {
+        // Transition to main menu scene
+        let mainMenuScene = MainMenuScene(size: size)
+        mainMenuScene.scaleMode = .resizeFill
+        view?.presentScene(mainMenuScene, transition: SKTransition.fade(withDuration: 0.5))
+    }
+    
+    // MARK: - AI Integration
+    
+    /// Handles AI moves in single player mode
+    private func handleAIMove() {
+        guard currentGameMode == .singlePlayer,
+              game.isAITurn else { return }
+        
+        // Show AI thinking indicator
+        showAIThinkingIndicator()
+        
+        // Delay AI move to show thinking
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.executeAIMove()
+        }
+    }
+    
+    /// Shows AI thinking indicator
+    private func showAIThinkingIndicator() {
+        // Remove existing indicator
+        aiThinkingIndicator?.removeFromParent()
+        
+        // Create thinking indicator
+        let indicator = SKNode()
+        
+        let spinner = SKShapeNode(circleOfRadius: 20)
+        spinner.strokeColor = .blue
+        spinner.lineWidth = 3
+        spinner.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        
+        let rotation = SKAction.rotate(byAngle: .pi * 2, duration: 1.0)
+        spinner.run(SKAction.repeatForever(rotation))
+        
+        let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        label.text = "AI Thinking..."
+        label.fontSize = 18
+        label.fontColor = .blue
+        label.position = CGPoint(x: size.width / 2, y: size.height / 2 - 40)
+        
+        indicator.addChild(spinner)
+        indicator.addChild(label)
+        
+        aiThinkingIndicator = indicator
+        addChild(indicator)
+    }
+    
+    /// Hides AI thinking indicator
+    private func hideAIThinkingIndicator() {
+        aiThinkingIndicator?.removeFromParent()
+        aiThinkingIndicator = nil
+    }
+    
+    /// Executes the AI's move
+    private func executeAIMove() {
+        guard let aiMove = game.getAIMove() else {
+            hideAIThinkingIndicator()
+            return
+        }
+        
+        // Hide thinking indicator
+        hideAIThinkingIndicator()
+        
+        // Execute the AI move
+        let success = game.perform(aiMove)
+        if success {
+            // Update UI
+            renderBoard()
+            renderAllPieces()
+            updateStatus()
+            updateCapturedPieces()
+            
+            // Check for game end
+            if game.gameOver {
+                handleGameEnd()
+            }
+        }
+    }
+    
+    // MARK: - Game End Handling
+    
+    /// Handles the end of a game
+    private func handleGameEnd() {
+        guard game.gameOver else { return }
+        
+        // Record game statistics if in single player mode
+        if currentGameMode == .singlePlayer {
+            let gameTime = game.gameDuration
+            let difficulty = gameModeManager.getCurrentAIDifficulty()
+            
+            if let winner = game.winner {
+                let humanColor: BanqiPieceColor = (gameModeManager.getCurrentHumanPlayer() == .red) ? .red : .black
+                let result: GameResult = (winner == humanColor) ? .win : .loss
+                gameModeManager.recordGameResult(result: result, gameTime: gameTime, difficulty: difficulty)
+            } else {
+                gameModeManager.recordGameResult(result: .draw, gameTime: gameTime, difficulty: difficulty)
+            }
+        }
+        
+        // Show end game banner
+        showEndGameBanner()
+    }
+    
+    /// Shows the end game banner
+    private func showEndGameBanner() {
+        // Remove existing banner
+        endgameBanner.removeAllChildren()
+        
+        let banner = SKNode()
+        
+        let background = SKShapeNode(rectOf: CGSize(width: 300, height: 150))
+        background.fillColor = SKColor(white: 0.1, alpha: 0.9)
+        background.strokeColor = .white
+        background.lineWidth = 2
+        background.position = CGPoint(x: size.width / 2, y: size.height / 2)
+        
+        let titleLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        titleLabel.fontSize = 24
+        titleLabel.fontColor = .white
+        
+        if let winner = game.winner {
+            let humanColor: BanqiPieceColor = (gameModeManager.getCurrentHumanPlayer() == .red) ? .red : .black
+            if winner == humanColor {
+                titleLabel.text = "🎉 You Win! 🎉"
+                titleLabel.fontColor = .green
+            } else {
+                titleLabel.text = "😔 AI Wins"
+                titleLabel.fontColor = .red
+            }
+        } else {
+            titleLabel.text = "🤝 Draw"
+            titleLabel.fontColor = .yellow
+        }
+        
+        titleLabel.position = CGPoint(x: size.width / 2, y: size.height / 2 + 20)
+        
+        let statsLabel = SKLabelNode(fontNamed: "AvenirNext-Regular")
+        statsLabel.fontSize = 16
+        statsLabel.fontColor = .white
+        statsLabel.text = "Game Time: \(String(format: "%.1f", game.gameDuration))s"
+        statsLabel.position = CGPoint(x: size.width / 2, y: size.height / 2 - 10)
+        
+        let newGameLabel = SKLabelNode(fontNamed: "AvenirNext-Bold")
+        newGameLabel.fontSize = 18
+        newGameLabel.fontColor = .blue
+        newGameLabel.text = "Tap New Game to play again"
+        newGameLabel.position = CGPoint(x: size.width / 2, y: size.height / 2 - 40)
+        
+        banner.addChild(background)
+        banner.addChild(titleLabel)
+        banner.addChild(statsLabel)
+        banner.addChild(newGameLabel)
+        
+        endgameBanner.addChild(banner)
+    }
+    
     // MARK: - New game
 
     private func resetGame() {

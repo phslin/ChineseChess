@@ -67,6 +67,13 @@ public final class BanqiGame {
     public var gameOver: Bool = false
     public var winner: BanqiPieceColor?
     public var lastAction: BanqiAction?
+    
+    // Game mode support
+    public var gameMode: GameMode = .twoPlayer
+    public var humanPlayer: HumanPlayer = .red
+    public var aiPlayer: BanqiAI?
+    public var gameStartTime: Date?
+    public var gameEndTime: Date?
 
     private var randomSource: GKRandomSource
 
@@ -320,6 +327,42 @@ public final class BanqiGame {
         }
     }
 
+    /// Gets the duration of the current game
+    public var gameDuration: TimeInterval {
+        guard let startTime = gameStartTime else { return 0.0 }
+        let endTime = gameEndTime ?? Date()
+        return endTime.timeIntervalSince(startTime)
+    }
+    
+    /// Sets up the game for single player mode
+    /// - Parameters:
+    ///   - mode: The game mode to set
+    ///   - humanPlayer: Which player the human will control
+    ///   - ai: The AI opponent
+    public func setupSinglePlayerMode(mode: GameMode, humanPlayer: HumanPlayer, ai: BanqiAI) {
+        self.gameMode = mode
+        self.humanPlayer = humanPlayer
+        self.aiPlayer = ai
+        self.gameStartTime = Date()
+    }
+    
+    /// Checks if it's the AI's turn to move
+    public var isAITurn: Bool {
+        guard gameMode == .singlePlayer,
+              let currentPlayer = sideToMove else { return false }
+        
+        return (currentPlayer == .red && humanPlayer == .black) ||
+               (currentPlayer == .black && humanPlayer == .red)
+    }
+    
+    /// Gets the AI's next move
+    public func getAIMove() -> BanqiAction? {
+        guard let ai = aiPlayer,
+              isAITurn else { return nil }
+        
+        return ai.selectMove(for: self, difficulty: GameModeManager.shared.getCurrentAIDifficulty())
+    }
+    
     // Get captured pieces for a specific side
     public func capturedPieces(for side: BanqiPieceColor) -> [BanqiPieceType] {
         var captured: [BanqiPieceType] = []
